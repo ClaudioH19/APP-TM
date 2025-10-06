@@ -1,4 +1,5 @@
 # Desde la raíz del proyecto:
+npm install
 npm run migration:run
 npm run migration:show
 npm run migration:revert
