@@ -1,0 +1,11 @@
+import 'reflect-metadata';
+export * from './Usuario';
+export * from './Mascota';
+export * from './HistorialMedico';
+export * from './Recorrido';
+export * from './PuntosRecorrido';
+export * from './Publicacion';
+export * from './Comentario';
+export * from './PuntoDeInteres';
+export * from './Resena';
+export * from './RealizadoPor';
