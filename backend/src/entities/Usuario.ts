@@ -33,4 +33,9 @@ export class Usuario {
 
   @OneToMany(() => Resena, (r: Resena) => r.usuario)
   resenas!: Resena[];
+  async createUser(nombre: string, contrasena: string, ubicacion: string) {
+    this.nombre = nombre;
+    this.contrasena = contrasena;
+    this.ubicacion = ubicacion;
+  }
 }
