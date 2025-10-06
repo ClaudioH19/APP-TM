@@ -1,0 +1,22 @@
+# INSTALACIÓN
+npm install typeorm reflect-metadata pg
+npm install -D typescript ts-node @types/node
+
+# VARIABLES (.env)
+# DB_HOST=localhost
+# DB_PORT=5432
+# DB_USER=postgres
+# DB_PASS=postgres
+# DB_NAME=app_tm
+# DB_SYNCHRONIZE=false
+
+# DESARROLLO
+npx ts-node src/index.ts
+
+# COMPILAR + PRODUCCIÓN
+npm run build
+node dist/index.js
+
+# MIGRACIONES (ejemplos)
+npx typeorm migration:generate src/migrations/Init -d src/data-source.ts
+npx typeorm migration:run -d src/data-source.ts
