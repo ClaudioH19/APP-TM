@@ -1,0 +1,10 @@
+{
+  "watch": ["backend/src"],
+  "ext": "ts",
+  "ignore": ["backend/dist", "backend/server.js"],
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "exec": "npx ts-node --transpile-only backend/src/index.ts",
+  "restartable": "rs"
+}
