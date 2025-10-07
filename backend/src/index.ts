@@ -2,9 +2,15 @@ import 'reflect-metadata';
 import { AppDataSource } from './data-source';
 import { env } from './config/env';
 
+// Importar la función de sincronización de Cloudinary
+import { syncCloudinary } from '../utils/cloud_sync.js';
+
 // Nota: La conexión ahora usa env.DB_URL vía data-source.ts
 
 async function bootstrap() {
+  // Sincronizar archivos de Drive antes de iniciar el servidor
+  // Sincronizar archivos de Cloudinary antes de iniciar el servidor
+  await syncCloudinary();
   try {
     await AppDataSource.initialize();
 
