@@ -1,14 +1,25 @@
 import 'reflect-metadata';
+import express from 'express';
 import { AppDataSource } from './data-source';
 import { env } from './config/env';
 
 // Importar la función de sincronización de Cloudinary
 import { syncCloudinary } from '../utils/cloud_sync.js';
 
+// Importar rutas
+import routes from './routes/index';
+
+const app = express();
+
+// Middleware
+app.use(express.json());
+
+// Usar rutas
+app.use('/api', routes);
+
 // Nota: La conexión ahora usa env.DB_URL vía data-source.ts
 
 async function bootstrap() {
-  // Sincronizar archivos de Drive antes de iniciar el servidor
   // Sincronizar archivos de Cloudinary antes de iniciar el servidor
   await syncCloudinary();
   try {
@@ -20,7 +31,9 @@ async function bootstrap() {
 
     console.log(`Conectado a la base de datos (${safeUrl})`);
     const port = Number(env.PORT);
-    console.log(`Servidor iniciado en puerto ${port}`);
+    app.listen(port, () => {
+      console.log(`Servidor iniciado en puerto ${port}`);
+    });
   } catch (err) {
     console.error('Error inicializando:', err);
     process.exit(1);
