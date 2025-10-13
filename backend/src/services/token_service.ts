@@ -30,7 +30,7 @@ export async function authenticateUser(nombre: string, contrasena: string) {
 
 export async function generateToken(nombre: string, contrasena: string) {
   const user = await authenticateUser(nombre, contrasena);
-  const token = jwt.sign({ usuario_id: user.usuario_id, nombre: user.nombre }, process.env.JWT_SECRET || "default_secret", {
+  const token = jwt.sign({ usuario_id: user.usuario_id, email: user.email }, process.env.JWT_SECRET || "kjasjdkasnbdka", {
     expiresIn: "1h",
   });
   return token;

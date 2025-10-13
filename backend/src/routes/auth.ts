@@ -6,8 +6,8 @@ const router = Router();
 // Ruta para login
 router.post('/login', async (req: Request, res: Response) => {
   try {
-    const { nombre, contrasena } = req.body;
-    const token = await generateToken(nombre, contrasena);
+    const { email, password } = req.body;
+    const token = await generateToken(email, password);
     res.json({ token });
   } catch (error: any) {
     res.status(401).json({ error: error.message });

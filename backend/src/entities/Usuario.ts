@@ -14,6 +14,9 @@ export class Usuario {
   nombre!: string;
 
   @Column({ type: 'text' })
+  email!: string;
+
+  @Column({ type: 'text' })
   contrasena!: string;
 
   @Column({ type: 'text' })
