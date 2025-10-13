@@ -10,14 +10,21 @@ export class Usuario {
   @PrimaryGeneratedColumn()
   usuario_id!: number;
 
+
   @Column({ type: 'text' })
   nombre!: string;
 
   @Column({ type: 'text' })
-  contrasena!: string;
+  apellido!: string;
+
+  @Column({ type: 'text', unique: true })
+  usuario!: string;
+
+  @Column({ type: 'text', unique: true })
+  email!: string;
 
   @Column({ type: 'text' })
-  ubicacion!: string;
+  contrasena!: string;
 
   @OneToMany(() => Mascota, (m: Mascota) => m.usuario)
   mascotas!: Mascota[];
