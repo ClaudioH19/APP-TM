@@ -1,14 +1,30 @@
 import { Usuario } from "entities";
 import { AppDataSource } from "data-source";
+import { rsaEncrypt } from "../security/rsa";
 
-export async function createUser(nombre: string, contrasena: string, ubicacion: string): Promise<Usuario> {
-  const usuarioRepository = AppDataSource.getRepository(Usuario);
-  const newUser = usuarioRepository.create({ nombre, contrasena, ubicacion });
-  const existingUser = await usuarioRepository.findOneBy({ nombre });
-  if (existingUser) {
-    throw new Error("Usuario ya existe");
-  }
-  return await usuarioRepository.save(newUser);
+export async function createUser(nombre: string, apellido: string, contrasena: string, email: string, usuario: string): Promise<Usuario> {
+   const usuarioRepository = AppDataSource.getRepository(Usuario);
+
+  // Verificaciones de unicidad
+  const [existingEmail, existingUsername] = await Promise.all([
+    usuarioRepository.findOneBy({ email }),
+    usuarioRepository.findOneBy({ usuario }),
+  ]);
+  if (existingEmail) throw new Error("Email ya está en uso");
+  if (existingUsername) throw new Error("Nombre de usuario ya está en uso");
+
+  // Cifrar contraseña con la clave pública (base64)
+  const contrasenaCifrada = rsaEncrypt(contrasena);
+
+  const nuevoUsuario = usuarioRepository.create({
+    nombre,
+    apellido,
+    contrasena: contrasenaCifrada,
+    email,
+    usuario,
+  });
+
+  return await usuarioRepository.save(nuevoUsuario);
 }
 
 export async function getUserById(id: number): Promise<Usuario | null> {
