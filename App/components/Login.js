@@ -41,6 +41,7 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
 
         if (data.token) {
           await AsyncStorage.setItem('token', data.token);
+          alert('Éxito', 'Has iniciado sesión correctamente');
         }
 
         setLoading(false);
