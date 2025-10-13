@@ -1,11 +1,12 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Demo from './components/Demo';
+import Login from './components/Login';
 import "./global.css"
 
 export default function App() {
   return (
     <View style={styles.container}>
-      <Demo />
+      <Login />
     </View>
   );
 }
