@@ -1,4 +1,3 @@
-import 'reflect-metadata';
 export * from './Usuario';
 export * from './Mascota';
 export * from './HistorialMedico';

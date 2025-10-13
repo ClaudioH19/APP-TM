@@ -27,6 +27,7 @@ export const AppDataSource = new DataSource({
     Resena,
     RealizadoPor
   ],
+  migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: env.DB_SYNCHRONIZE,
   logging: env.DB_LOGGING,
   ssl: {

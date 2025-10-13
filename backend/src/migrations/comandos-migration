@@ -1,0 +1,14 @@
+# Desde la raíz del proyecto:
+npm install
+npm run migration:run
+npm run migration:show
+npm run migration:revert
+npm run migration:generate
+
+# Si estás dentro de backend/:
+npm --prefix .. run migration:run
+npm --prefix .. run migration:show
+npm --prefix .. run migration:revert
+
+# Regenerar (cuidado):
+npm --prefix .. run migration:generate
