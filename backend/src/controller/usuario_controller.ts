@@ -4,42 +4,42 @@ import * as jwt from "jsonwebtoken";
 import { Usuario } from "../entities/Usuario";
 import { AppDataSource } from "../data-source";
 import { Response } from "express";
+import { rsaEncrypt } from "../security/rsa";
 
-export async function createUser(
-    request: { nombre: string; contrasena: string; ubicacion: string },
-    response: Response
-  ): Promise<Usuario | void> {
-    if (!request.nombre || !request.contrasena || !request.ubicacion) {
-      response.status(400).json({ message: "Faltan datos obligatorios" });
-      return;
-    }
-    else if(request.contrasena.length < 6){
-      response.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
-      return;
-    }
-    try {
-        const userRepository = AppDataSource.getRepository(Usuario);
-        const existingUser = await userRepository.findOneBy({ nombre: request.nombre });
-        if (existingUser) {
-            throw new Error("Usuario ya existe");
-        }
-        const hashedPassword = await argon2.hash(request.contrasena);
-        const newUser = userRepository.create({
-            nombre: request.nombre,
-            contrasena: hashedPassword,
-            ubicacion: request.ubicacion
-        });
-        await userRepository.save(newUser);
-        response.status(201).json(newUser);
-        return newUser;
-    } catch (error: any) {
-        if (error.message === "Usuario ya existe") {
-            response.status(409).json({ message: error.message });
-        } else {
-            response.status(500).json({ message: "Error al crear el usuario" });
-        }
-    }   
+export async function registerUser(req: Request, res: Response) {
+  const { nombre, apellido, contrasena, email, usuario } = req.body as any;
+  if (!nombre || !apellido || !contrasena || !email || !usuario) {
+    return res.status(400).json({ error: "Faltan campos" });
   }
+
+  try {
+    const repo = AppDataSource.getRepository(Usuario);
+
+    // verificaciones de unicidad
+    if (await repo.findOneBy({ email })) {
+      return res.status(409).json({ error: "Email ya está en uso" });
+    }
+    if (await repo.findOneBy({ usuario })) {
+      return res.status(409).json({ error: "Nombre de usuario ya está en uso" });
+    }
+
+    // crea y guarda el usuario
+    const nuevo = repo.create({
+      nombre,
+      apellido,
+      email,
+      usuario,
+      contrasena: rsaEncrypt(contrasena), // cifra la contraseña con la clave pública (base64)
+    });
+
+    const saved = await repo.save(nuevo);
+    const { contrasena: _omit, ...safe } = saved as any;
+    return res.status(201).json(safe);
+  } catch (e: any) {
+    return res.status(500).json({ error: "No se pudo registrar" });
+  }
+}
+  
 
 export async function getUserById(id: number, response: Response): Promise<Usuario | void> {
   try {
