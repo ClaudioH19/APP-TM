@@ -3,7 +3,7 @@ npm install typeorm reflect-metadata pg
 npm install -D typescript ts-node @types/node
 
 # DESARROLLO
-npx ts-node src/index.ts
+npm run dev
 
 # COMPILAR + PRODUCCIÓN
 npm run build
