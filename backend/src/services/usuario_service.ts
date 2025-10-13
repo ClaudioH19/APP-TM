@@ -1,9 +1,9 @@
 import { Usuario } from "entities";
 import { AppDataSource } from "data-source";
 
-export async function createUser(nombre: string, contrasena: string, ubicacion: string): Promise<Usuario> {
+export async function createUser(nombre: string, contrasena: string): Promise<Usuario> {
   const usuarioRepository = AppDataSource.getRepository(Usuario);
-  const newUser = usuarioRepository.create({ nombre, contrasena, ubicacion });
+  const newUser = usuarioRepository.create({ nombre, contrasena });
   const existingUser = await usuarioRepository.findOneBy({ nombre });
   if (existingUser) {
     throw new Error("Usuario ya existe");

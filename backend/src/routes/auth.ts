@@ -17,8 +17,8 @@ router.post('/login', async (req: Request, res: Response) => {
 // Ruta para registro
 router.post('/register', async (req: Request, res: Response) => {
   try {
-    const { nombre, contrasena, ubicacion } = req.body;
-    const user = await createUser({ nombre, contrasena, ubicacion });
+    const { email, contrasena } = req.body;
+    const user = await createUser({ email, contrasena });
     res.json({ message: 'Usuario creado', user });
   } catch (error: any) {
     res.status(400).json({ error: error.message });

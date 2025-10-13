@@ -6,10 +6,10 @@ import { AppDataSource } from "../data-source";
 import { Response } from "express";
 
 export async function createUser(
-    request: { nombre: string; contrasena: string; ubicacion: string },
+    request: { nombre: string; contrasena: string },
     response: Response
   ): Promise<Usuario | void> {
-    if (!request.nombre || !request.contrasena || !request.ubicacion) {
+    if (!request.nombre || !request.contrasena) {
       response.status(400).json({ message: "Faltan datos obligatorios" });
       return;
     }
