@@ -10,15 +10,24 @@ export class Usuario {
   @PrimaryGeneratedColumn()
   usuario_id!: number;
 
-  @Column({ type: 'text' })
+  @Column({ type: 'text', nullable: false })
   nombre!: string;
 
-  @Column({ type: 'text' })
+  @Column({ type: 'text', nullable: false })
+  apellido!: string;
+
+  @Column({ type: 'text', nullable: false })
   contrasena!: string;
 
-  @Column({ type: 'text' })
-  ubicacion!: string;
+  @Index({ unique: true })
+  @Column({ type: 'text', nullable: false })
+  usuario!: string;
 
+  @Index({ unique: true })
+  @Column({ type: 'text', nullable: false })
+  email!: string;
+
+  // Relaciones
   @OneToMany(() => Mascota, (m: Mascota) => m.usuario)
   mascotas!: Mascota[];
 
