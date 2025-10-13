@@ -26,7 +26,7 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
       if (!validate()) return;
       setLoading(true);
       try {
-        const resp = await fetch('http://10.0.2.2:3000/api/auth/login', {
+        const resp = await fetch('http://192.168.1.36:3000/api/auth/login', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({email, password}),
