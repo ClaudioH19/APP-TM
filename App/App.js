@@ -1,13 +1,21 @@
 import { StyleSheet, Text, View } from 'react-native';
-import Demo from './components/Demo';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import HomeComponent from './components/HomeComponent';
 import Login from './components/Login';
-import "./global.css"
+import Header from './components/Header';
+import "./global.css";
+
+const Stack = createNativeStackNavigator();
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Login />
-    </View>
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Login">
+        <Stack.Screen name="Login" component={Login} options={{ headerShown: false }} />
+        <Stack.Screen name="Home" component={HomeComponent} options={{  headerRight: () => <Header /> }} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
 
