@@ -8,6 +8,7 @@ import { syncCloudinary } from '../utils/cloud_sync.js';
 
 // Importar rutas
 import routes from './routes/index';
+import authRouter from './routes/auth';
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use(express.json());
 
 // Usar rutas
 app.use('/api', routes);
+app.use('/auth', authRouter);
 
 // Nota: La conexión ahora usa env.DB_URL vía data-source.ts
 

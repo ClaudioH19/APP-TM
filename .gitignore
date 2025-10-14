@@ -160,3 +160,5 @@ temp/
 
 # Backend credentials (Google OAuth tokens)
 backend/.credentials/
+
+keys/*
