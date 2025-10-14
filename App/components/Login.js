@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Image, Dimensions, Platform, SafeAreaView, KeyboardAvoidingView, TouchableOpacity, ActivityIndicator, Alert, TextInput, View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
 const { height } = Dimensions.get('window');
+import { useNavigation } from '@react-navigation/native';
 
 export default function Login({ onLoginSuccess, onCreateAccount }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const navigation = useNavigation();
 
     const validate = () => {
       if (!email || !password) {
@@ -26,7 +27,7 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
       if (!validate()) return;
       setLoading(true);
       try {
-        const resp = await fetch('http://192.168.1.36:3000/api/auth/login', {
+        const resp = await fetch('http://192.168.85.202:3000/api/auth/login', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({email, password}),
@@ -42,6 +43,7 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
         if (data.token) {
           await AsyncStorage.setItem('token', data.token);
           alert('Éxito', 'Has iniciado sesión correctamente');
+          navigation.navigate('Home');
         }
 
         setLoading(false);
