@@ -59,42 +59,9 @@ cd TM
 
 ### 2. Configurar el Backend
 ```bash
-cd backend
-npm install
+npm install # en la ruta del proyecto
 
-# Copiar y configurar variables de entorno
-cp .env.example .env
-# Editar .env con tus credenciales de base de datos
-```
-
-### 3. Configurar el Frontend
-```bash
-cd ../App
-npm install
-```
-
-## 🗄️ Configuración de Base de Datos
-
-### Variables de entorno (.env en backend/)
-```env
-# Database Configuration
-DB_HOST=tu-host-postgresql
-DB_PORT=5432
-DB_NAME=nombre_base_datos
-DB_USER=usuario
-DB_PASSWORD=contraseña
-DB_SSL=true
-
-# JWT Configuration
-JWT_SECRET=tu_clave_secreta_jwt
-JWT_EXPIRES_IN=24h
-
-# Server Configuration
-PORT=3000
-FRONTEND_URL=http://localhost:8081
-```
-
-## 🏃‍♂️ Ejecución
+## Ejecución
 
 ### Desarrollo - Backend
 ```bash

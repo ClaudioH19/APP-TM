@@ -22,12 +22,6 @@ export class Usuario {
   @Column({ type: 'text', unique: true, nullable: false })
   usuario!: string;
 
-  @Column({ type: 'text', unique: true })
-  email!: string;
-
-  @Column({ type: 'text' })
-  contrasena!: string;
-
   @Index({ unique: true })
   @Column({ type: 'text', nullable: false })
   email!: string;
