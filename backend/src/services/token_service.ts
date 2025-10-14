@@ -3,21 +3,21 @@ import argon2 from "argon2";
 import { Usuario } from "../entities/Usuario";
 import { AppDataSource } from "../data-source";
 
-export async function createUser(params: { nombre: string; contrasena: string; ubicacion: string }) {
+export async function createUser(params: { email: string; contrasena: string }) {
   const hashedPassword = await argon2.hash(params.contrasena, {
     type: argon2.argon2id,
   });
   const usuario = new Usuario();
-  usuario.nombre = params.nombre;
+  usuario.nombre = params.email; // Usar email como nombre por defecto, o ajustar si hay campo nombre separado
+  usuario.email = params.email;
   usuario.contrasena = hashedPassword;
-  usuario.ubicacion = params.ubicacion;
 
   const usuarioRepository = AppDataSource.getRepository(Usuario);
   return await usuarioRepository.save(usuario);
 }
-export async function authenticateUser(nombre: string, contrasena: string) {
+export async function authenticateUser(email: string, contrasena: string) {
   const usuarioRepository = AppDataSource.getRepository(Usuario);
-  const user = await usuarioRepository.findOneBy({ nombre });
+  const user = await usuarioRepository.findOneBy({ email });
   if (!user) {
     throw new Error("Usuario no encontrado");
   }
@@ -28,9 +28,9 @@ export async function authenticateUser(nombre: string, contrasena: string) {
   return user;
 }
 
-export async function generateToken(nombre: string, contrasena: string) {
-  const user = await authenticateUser(nombre, contrasena);
-  const token = jwt.sign({ usuario_id: user.usuario_id, nombre: user.nombre }, process.env.JWT_SECRET || "default_secret", {
+export async function generateToken(email: string, contrasena: string) {
+  const user = await authenticateUser(email, contrasena);
+  const token = jwt.sign({ usuario_id: user.usuario_id, email: user.email }, process.env.JWT_SECRET || "default_secret", {
     expiresIn: "1h",
   });
   return token;
