@@ -11,6 +11,5 @@ router.get('/health', (req, res) => {
 // Rutas de autenticación
 router.use('/auth', authRouter);
 
-// Aquí puedes agregar más rutas
 
 export default router;

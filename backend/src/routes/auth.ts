@@ -1,28 +1,12 @@
-import { Router, Request, Response } from 'express';
-import { generateToken, createUser } from '../services/token_service';
+import { Router } from 'express';
+import { AuthController } from '../controllers/auth.controller';
 
 const router = Router();
 
-// Ruta para login
-router.post('/login', async (req: Request, res: Response) => {
-  try {
-    const { email, password } = req.body;
-    const token = await generateToken(email, password);
-    res.json({ token });
-  } catch (error: any) {
-    res.status(401).json({ error: error.message });
-  }
-});
+//login
+router.post('/login', (req, res) => AuthController.login(req, res));
 
-// Ruta para registro
-router.post('/register', async (req: Request, res: Response) => {
-  try {
-    const { email, contrasena } = req.body;
-    const user = await createUser({ email, contrasena });
-    res.json({ message: 'Usuario creado', user });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
-  }
-});
+//register
+router.post('/register', (req, res) => AuthController.register(req, res));
 
 export default router;

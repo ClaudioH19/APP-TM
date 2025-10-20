@@ -3,20 +3,34 @@ import argon2 from "argon2";
 import { Usuario } from "../entities/Usuario";
 import { AppDataSource } from "../data-source";
 
-export async function createUser(params: { email: string; contrasena: string }) {
-  const hashedPassword = await argon2.hash(params.contrasena, {
-    type: argon2.argon2id,
-  });
+// repositorio global de Usuario
+const usuarioRepository = AppDataSource.getRepository(Usuario);
+
+export async function createUser(params: { nombre: string; apellido: string; usuario: string; email: string; contrasena: string }) {
+  const hashedPassword = await argon2.hash(params.contrasena, { type: argon2.argon2id });
+
   const usuario = new Usuario();
-  usuario.nombre = params.email; // Usar email como nombre por defecto, o ajustar si hay campo nombre separado
+  usuario.nombre = params.nombre;
+  usuario.apellido = params.apellido;
+  usuario.usuario = params.usuario;
   usuario.email = params.email;
   usuario.contrasena = hashedPassword;
 
-  const usuarioRepository = AppDataSource.getRepository(Usuario);
+  if (!usuario.nombre || !usuario.apellido || !usuario.usuario || !usuario.email || !usuario.contrasena) {
+    throw new Error("Faltan campos obligatorios");
+  }
+
+  // Validaciones de unicidad
+  if (await usuarioRepository.exists({ where: { email: usuario.email } })) {
+    throw new Error("El email ya está en uso");
+  }
+  if (await usuarioRepository.exists({ where: { usuario: usuario.usuario } })) {
+    throw new Error("El nombre de usuario ya está en uso");
+  }
+
   return await usuarioRepository.save(usuario);
 }
 export async function authenticateUser(email: string, contrasena: string) {
-  const usuarioRepository = AppDataSource.getRepository(Usuario);
   const user = await usuarioRepository.findOneBy({ email });
   if (!user) {
     throw new Error("Usuario no encontrado");
@@ -45,7 +59,6 @@ export async function verifyToken(token: string) {
 }
 export async function getUserFromToken(token: string) {
   const decoded: any = await verifyToken(token);
-  const usuarioRepository = AppDataSource.getRepository(Usuario);
   const user = await usuarioRepository.findOneBy({ usuario_id: decoded.usuario_id });
   return user;
 }
@@ -56,7 +69,6 @@ export async function verifyPassword(hashedPassword: string, plainPassword: stri
   return await argon2.verify(hashedPassword, plainPassword);
 }   
 export async function changePassword(usuario_id: number, newPassword: string): Promise<void> {
-  const usuarioRepository = AppDataSource.getRepository(Usuario);
   const user = await usuarioRepository.findOneBy({ usuario_id });
   if (!user) {
     throw new Error("Usuario no encontrado");
