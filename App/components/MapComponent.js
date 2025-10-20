@@ -2,11 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Dimensions, Alert, ActivityIndicator } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Footer from './Footer';
 
 const MapComponent = () => {
   const [region, setRegion] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // safe area insets para detectar espacio inferior (barra de navegación software)
+  const insets = useSafeAreaInsets();
+  const BOTTOM_INSET = insets.bottom || 0;
+  const FOOTER_HEIGHT = 56; // debe coincidir con la altura visual del footer
 
   useEffect(() => {
     getUserLocation();
@@ -73,15 +80,14 @@ const MapComponent = () => {
   return (
     <View style={styles.container}>
       <MapView
-        style={styles.map}
+        style={[styles.map, { paddingBottom: FOOTER_HEIGHT + BOTTOM_INSET }]}
         provider={PROVIDER_DEFAULT}
         region={region}
         onRegionChangeComplete={setRegion}
-        showsUserLocation={true} // muestra el punto azul de ubicación
-        showsMyLocationButton={true} // muestra el botón para centrar en ubicación
-        followsUserLocation={true} // sigue la ubicación del usuario
+        showsUserLocation={true}
+        showsMyLocationButton={true}
+        followsUserLocation={true}
       >
-        {/* marcador personalizado en la ubicacion del usuario */}
         {userLocation && (
           <Marker
             coordinate={userLocation}
@@ -91,6 +97,11 @@ const MapComponent = () => {
           />
         )}
       </MapView>
+
+      {/* Footer posicionado absolute; el wrapper reserva el alto visible (footer + posible inset) */}
+      <View style={[styles.footerWrap, { height: FOOTER_HEIGHT + BOTTOM_INSET, paddingBottom: BOTTOM_INSET }]}>
+        <Footer />
+      </View>
     </View>
   );
 };
@@ -108,6 +119,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
+  },
+  footerWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    // backgroundColor: 'transparent', // si quieres ver overlay
+    justifyContent: 'flex-end',
   },
 });
 
