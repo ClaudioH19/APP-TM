@@ -14,6 +14,8 @@ const app = express();
 
 // Middleware
 app.use(express.json());
+app.use('/media', express.static(__dirname + '/../media_local'));
+app.set('dataSource', AppDataSource);
 
 // Usar rutas
 app.use('/api', routes);
