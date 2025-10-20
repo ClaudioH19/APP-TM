@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import authRouter from './auth';
-
+import publicationRouter from './publication';
 const router = Router();
 
 // Ejemplo de ruta
@@ -10,7 +10,6 @@ router.get('/health', (req, res) => {
 
 // Rutas de autenticación
 router.use('/auth', authRouter);
-
-// Aquí puedes agregar más rutas
+router.use('/publications', publicationRouter);
 
 export default router;

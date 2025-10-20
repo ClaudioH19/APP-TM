@@ -1,6 +1,6 @@
-import { AppDataSource } from './data-source';
-import { Usuario } from './entities/Usuario';
-import { hashPassword } from './services/token_service';
+import { AppDataSource } from '../data-source';
+import { Usuario } from '../entities/Usuario';
+import { hashPassword } from '../services/token_service';
 
 async function seed() {
   try {

@@ -8,7 +8,8 @@
     "start": "node dist/index.js",
     "seed": "ts-node-dev --transpile-only src/seed.ts",
     "sync:drive-oauth": "node utils/drive_oauth_sync.js",
-    "sync:drive-service": "node utils/drive_service_account_sync.js"
+    "sync:drive-service": "node utils/drive_service_account_sync.js",
+    "seeds": "node runSeeds.js"
   },
   "dependencies": {
     "argon2": "^0.44.0",

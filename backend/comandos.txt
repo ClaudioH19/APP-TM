@@ -1,4 +1,4 @@
-# INSTALACIÓN
+# INSTALACIÓN de dependencias en la raiz del proyecto (no /backend)
 npm install typeorm reflect-metadata pg
 npm install -D typescript ts-node @types/node
 

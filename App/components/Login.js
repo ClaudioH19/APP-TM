@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Image, Dimensions, Platform, SafeAreaView, KeyboardAvoidingView, TouchableOpacity, ActivityIndicator, Alert, TextInput, View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
+import { API_ENDPOINTS } from '../config/api';
 
 const { height } = Dimensions.get('window');
 
@@ -8,6 +10,7 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const navigation = useNavigation();
 
     const validate = () => {
       if (!email || !password) {
@@ -26,7 +29,7 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
       if (!validate()) return;
       setLoading(true);
       try {
-        const resp = await fetch('http://192.168.1.36:3000/api/auth/login', {
+        const resp = await fetch(API_ENDPOINTS.LOGIN, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({email, password}),
@@ -42,6 +45,7 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
         if (data.token) {
           await AsyncStorage.setItem('token', data.token);
           alert('Éxito', 'Has iniciado sesión correctamente');
+          navigation.navigate('Home');
         }
 
         setLoading(false);
@@ -86,10 +90,11 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
                   {loading ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-semibold">Entrar</Text>}
                 </TouchableOpacity>
 
-                <TouchableOpacity className="flex-1 bg-white h-12 rounded-lg items-center justify-center border border-[#5bbbe8]" onPress={() => (onCreateAccount ? onCreateAccount() : Alert.alert('Crear cuenta', 'Implementa la pantalla de registro'))}>
+                <TouchableOpacity className="flex-1 bg-white h-12 rounded-lg items-center justify-center border border-[#5bbbe8]" onPress={() => navigation.navigate('Register')}>
                   <Text className="text-[#5bbbe8] font-semibold">Crear cuenta</Text>
                 </TouchableOpacity>
               </View>
+
             </View>
           </View>
 
@@ -98,4 +103,18 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
       </SafeAreaView>
     );
   }
- 
+
+// Estilos
+const styles = {
+  registerLink: {
+    marginTop: 20,
+    padding: 10
+  },
+  registerLinkText: {
+    color: '#007bff',
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '600'
+  }
+}
+
