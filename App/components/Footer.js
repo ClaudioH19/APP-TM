@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, Text, SafeAreaView, ScrollView, Pressable } from 'react-native';
 import { Home, MapPin, PlusCircle, User, Heart } from 'lucide-react-native';
-       
+import { useNavigation } from '@react-navigation/native';
 
 
 const Footer = () => {
+  const navigation = useNavigation();
+
   return (
     <SafeAreaView className="bg-gray-50 flex-1 mb-12">
         {/* Bottom Navigation */}
@@ -20,7 +22,7 @@ const Footer = () => {
               <Text className="text-xs text-gray-400">Mapa</Text>
             </Pressable>
 
-            <Pressable className="items-center gap-1 -mt-6">
+            <Pressable onPress={() => navigation.navigate('CreatePost')} className="items-center gap-1 -mt-6">
               <View className="bg-blue-500 rounded-full p-4">
                 <PlusCircle size={28} color="#ffffff" />
               </View>

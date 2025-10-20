@@ -12,4 +12,8 @@ router.get('/location', async (req, res) => {
   res.json({ name });
 });
 
+router.post('/', PublicationController.createPublication);
+router.get('/:id', PublicationController.getPublicationById);
+router.delete('/:id', PublicationController.deletePublication);
+
 export default router;
