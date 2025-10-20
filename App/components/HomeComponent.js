@@ -4,27 +4,15 @@ import { Home, MapPin, PlusCircle, User, Heart } from 'lucide-react-native';
 import { PostCard } from './PostCard';
 import Footer from './Footer';
 import Header from './Header';
-
+import { usePosts } from '../hooks/usePosts';
+import { API_ENDPOINTS } from '../config/api';
 
 
 const HomeComponent = () => {
-  const posts = [
-    {
-      id: 1,
-      user: {
-        name: 'Joshua J',
-        avatar: 'https://i.pravatar.cc/150?img=12',
-        time: '9h'
-      },
-      content:
-        'Mis perritos y mi gato conviviendo felizmente en el jardín. ¡Estos días han sido increíbles para las mascotas durante estos días calurosos. Siempre debe tener agua fresca disponible. #TiempoEnElParque #CuidadoDeMascotas',
-      image:
-        'https://images.unsplash.com/photo-1450778869180-41d0601e046e?w=800&h=600&fit=crop',
-      likes: 45,
-      comments: 10,
-      shares: 13
-    }
-  ];
+  const { posts, loading, error } = usePosts(API_ENDPOINTS.POSTS);
+
+  if (loading) return <Text className="text-center mt-10">Cargando publicaciones...</Text>;
+  if (error) return <Text className="text-center mt-10 text-red-500">{error}</Text>;
 
   return (
     <SafeAreaView className="bg-gray-50 flex-1">
