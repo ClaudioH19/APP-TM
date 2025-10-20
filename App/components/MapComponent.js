@@ -14,7 +14,7 @@ const MapComponent = () => {
 
   const getUserLocation = async () => {
     try {
-      // Solicitar permisos de ubicación
+      // solicita permisos de ubicación
       const { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
@@ -22,7 +22,7 @@ const MapComponent = () => {
           'Permiso denegado',
           'Se necesita permiso de ubicación para mostrar tu posición en el mapa'
         );
-        // Ubicación por defecto (Santiago, Chile)
+        // ubicacion por defecto si no se otorgan permisos
         setRegion({
           latitude: -33.4489,
           longitude: -70.6693,
@@ -33,7 +33,7 @@ const MapComponent = () => {
         return;
       }
 
-      // Obtener ubicación actual
+      // obtiene la ubicación actual
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
@@ -51,7 +51,7 @@ const MapComponent = () => {
     } catch (error) {
       console.error('Error obteniendo ubicación:', error);
       Alert.alert('Error', 'No se pudo obtener tu ubicación');
-      // Ubicación por defecto
+      // ubicacion por defecto en caso de error
       setRegion({
         latitude: -33.4489,
         longitude: -70.6693,
@@ -77,11 +77,11 @@ const MapComponent = () => {
         provider={PROVIDER_DEFAULT}
         region={region}
         onRegionChangeComplete={setRegion}
-        showsUserLocation={true} // Muestra el punto azul de ubicación
-        showsMyLocationButton={true} // Botón para centrar en ubicación
-        followsUserLocation={true} // Sigue la ubicación del usuario
+        showsUserLocation={true} // muestra el punto azul de ubicación
+        showsMyLocationButton={true} // muestra el botón para centrar en ubicación
+        followsUserLocation={true} // sigue la ubicación del usuario
       >
-        {/* Marcador personalizado en la ubicación del usuario */}
+        {/* marcador personalizado en la ubicacion del usuario */}
         {userLocation && (
           <Marker
             coordinate={userLocation}

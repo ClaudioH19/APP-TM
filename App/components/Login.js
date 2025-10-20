@@ -104,7 +104,6 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
     );
   }
 
-// Estilos
 const styles = {
   registerLink: {
     marginTop: 20,
