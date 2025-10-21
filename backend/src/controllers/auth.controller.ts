@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { generateToken, createUser } from '../services/token_service';
+import { verifyToken, getUserFromToken } from '../services/token_service';
+import { createUser, generateToken } from '../services/token_service';
 
 export class AuthController {
   static async login(req: Request, res: Response) {
@@ -19,6 +20,29 @@ export class AuthController {
       return res.json({ message: 'Usuario creado' });
     } catch (error: any) {
       return res.status(400).json({ error: error.message });
+    }
+  }
+
+  static async me(req: Request, res: Response) {
+    try {
+      const auth = req.headers.authorization || '';
+      const token = auth.startsWith('Bearer ') ? auth.slice(7) : auth;
+
+      if (!token) {
+        return res.status(401).json({ error: 'Sin token' });
+      }
+
+
+      await verifyToken(token);
+
+      const user = await getUserFromToken(token);
+      if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+     
+      const { contrasena, ...safeUser } = (user as any);
+      return res.json({ user: safeUser });
+    } catch (err: any) {
+      return res.status(401).json({ error: err.message || 'Token inválido' });
     }
   }
 }

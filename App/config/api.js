@@ -7,5 +7,6 @@ export const API_ENDPOINTS = {
   REGISTER: `${API_URL}/auth/register`,
   POSTS: `${API_URL}/api/publications`,
   MEDIA: `${API_URL}/media`,
-  LOCATION: `${API_URL}/api/publications/location`
+  LOCATION: `${API_URL}/api/publications/location`,
+  ME: `${API_URL}/auth/me` // endpoint para verificar token y obtener usuario
 };

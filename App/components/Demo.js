@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Alert, SafeAreaView, Pressable } from 'react-native';
+import { View, Text, Alert, SafeAreaView, Pressable } from 'react-native-safe-area-context';
 import { Camera } from 'expo-camera';
 import * as Location from 'expo-location';
 

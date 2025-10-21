@@ -84,6 +84,9 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                autoCapitalize="none"
+                importantForAutofill="no"
+                textContentType="password"
               />
 
               <View className="flex-row">
