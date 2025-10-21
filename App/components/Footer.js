@@ -10,9 +10,7 @@ const Footer = () => {
   const navigation = useNavigation();
 
   return (
-    // evitar safe-area bottom para que el wrapper en MapComponent maneje el inset
-    <SafeAreaView edges={['left','right','top']} style={styles.safeArea}>
-      {/* Bottom Navigation */}
+    <SafeAreaView edges={['left','right','bottom']} style={styles.safeArea}>
       <View style={styles.outer}>
         <View style={styles.row}>
           <Pressable style={styles.item} onPress={() => navigation.navigate('Home')}>
@@ -51,17 +49,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc'
   },
   outer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     alignSelf: 'center',
     maxWidth: 640,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
     height: FOOTER_HEIGHT,
-    justifyContent: 'center'
+    justifyContent: 'center',
+    width: '100%',
+
   },
   row: {
     flexDirection: 'row',

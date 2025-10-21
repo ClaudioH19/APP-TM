@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, SafeAreaView, ScrollView, Pressable } from 'react-native';
+import { View, Text,ScrollView, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Home, MapPin, PlusCircle, User, Heart } from 'lucide-react-native';
 import { PostCard } from './PostCard';
 import Footer from './Footer';
@@ -15,7 +16,7 @@ const HomeComponent = () => {
   if (error) return <Text className="text-center mt-10 text-red-500">{error}</Text>;
 
   return (
-    <SafeAreaView className="bg-gray-50 flex-1">
+    <SafeAreaView className="bg-gray-50 flex-1" edges={['top', 'left', 'right']}>
       <View className="max-w-md self-center w-full flex-1">
         {/* Header */}
 

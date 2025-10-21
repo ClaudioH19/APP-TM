@@ -1,19 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Dimensions, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Footer from './Footer';
 
 const MapComponent = () => {
   const [region, setRegion] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // safe area insets para detectar espacio inferior (barra de navegación software)
-  const insets = useSafeAreaInsets();
-  const BOTTOM_INSET = insets.bottom || 0;
-  const FOOTER_HEIGHT = 56; // debe coincidir con la altura visual del footer
 
   useEffect(() => {
     getUserLocation();
@@ -80,7 +74,7 @@ const MapComponent = () => {
   return (
     <View style={styles.container}>
       <MapView
-        style={[styles.map, { paddingBottom: FOOTER_HEIGHT + BOTTOM_INSET }]}
+        style={styles.map}  // el mapa ocupa todo el espacio disponible
         provider={PROVIDER_DEFAULT}
         region={region}
         onRegionChangeComplete={setRegion}
@@ -98,36 +92,27 @@ const MapComponent = () => {
         )}
       </MapView>
 
-      {/* Footer posicionado absolute; el wrapper reserva el alto visible (footer + posible inset) */}
-      <View style={[styles.footerWrap, { height: FOOTER_HEIGHT + BOTTOM_INSET, paddingBottom: BOTTOM_INSET }]}>
-        <Footer />
-      </View>
+      {/* Footer al final, gestiona su propio safe area (edges=['left','right','bottom']) */}
+      <Footer />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flex: 1
   },
   map: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height,
+    flex: 1
+    // width/height fijos eliminados para permitir que el Footer ocupe su altura
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
-  },
-  footerWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    // backgroundColor: 'transparent', // si quieres ver overlay
-    justifyContent: 'flex-end',
-  },
+  }
+  // footerWrap eliminado
 });
 
 export default MapComponent;
