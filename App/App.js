@@ -5,6 +5,7 @@ import HomeComponent from './components/HomeComponent';
 import Login from './components/Login';
 import Register from './components/Register';
 import Header from './components/Header';
+import MapComponent from './components/MapComponent';
 import "./global.css";
 
 const Stack = createNativeStackNavigator();
@@ -15,6 +16,7 @@ export default function App() {
       <Stack.Navigator initialRouteName="Login">
         <Stack.Screen name="Login" component={Login} options={{ headerShown: false }} />
         <Stack.Screen name="Register" component={Register} options={{ title: 'Registro' }} />
+        <Stack.Screen name="Map" component={MapComponent} options={{ title: 'Mapa' }} />
         <Stack.Screen name="Home" component={HomeComponent} options={{  headerRight: () => <Header /> }} />
       </Stack.Navigator>
     </NavigationContainer>
