@@ -124,6 +124,10 @@ export default function Register({ navigation }) {
             value={contrasena}
             onChangeText={setContrasena}
             secureTextEntry
+            autoCapitalize="none"       
+            autoCorrect={false}          
+            textContentType="password"   
+            importantForAutofill="no"    
             placeholderTextColor="#999"
           />
         </View>

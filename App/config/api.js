@@ -1,6 +1,6 @@
 // permite simplificar las llamadas a la API y una ip global para todo el frontend
 
-import CreatePost from "../components/CreatePost";
+export const API_URL = 'http://192.168.120.202:3000';
 
 export const API_URL = 'http://192.168.137.173:3000';
 
@@ -10,5 +10,6 @@ export const API_ENDPOINTS = {
   POSTS: `${API_URL}/api/publications`,
   MEDIA: `${API_URL}/media`,
   LOCATION: `${API_URL}/api/publications/location`,
-  CREATEPOST: `${API_URL}/api/publications/create`
+  CREATEPOST: `${API_URL}/api/publications/create`,
+  ME: `${API_URL}/auth/me`
 };

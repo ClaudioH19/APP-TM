@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Image, Dimensions, Platform, SafeAreaView, KeyboardAvoidingView, TouchableOpacity, ActivityIndicator, Alert, TextInput, View, Text } from 'react-native';
+import { Image, Dimensions, Platform, KeyboardAvoidingView, TouchableOpacity, ActivityIndicator, Alert, TextInput, View, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { API_ENDPOINTS } from '../config/api';
@@ -83,6 +84,9 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                autoCapitalize="none"
+                importantForAutofill="no"
+                textContentType="password"
               />
 
               <View className="flex-row">
@@ -104,7 +108,6 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
     );
   }
 
-// Estilos
 const styles = {
   registerLink: {
     marginTop: 20,
