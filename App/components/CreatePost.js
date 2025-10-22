@@ -19,23 +19,20 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
-
+import { API_ENDPOINTS } from '../config/api';
+import usePets from '../hooks/usePets';
 const { width, height } = Dimensions.get('window');
 
-// Sample pets if none provided via props
-const DEFAULT_PETS = [
-  { id: '1', description: 'se llama Firulais' },
-];
 
-export default function CreatePost({ pets = DEFAULT_PETS, onSubmit }) {
+export default function CreatePost({onSubmit }) {
+  const { pets, loading: loadingPets, error: errorPets } = usePets(API_ENDPOINTS.PETS);
   const [step, setStep] = useState(1);
   const [description, setDescription] = useState('');
   const [mediaUri, setMediaUri] = useState(null);
   const [mediaType, setMediaType] = useState(null); // 'image' | 'video'
   const [mediaExt, setMediaExt] = useState('');
-  const [selectedPet, setSelectedPet] = useState(pets.length ? pets[0].id : null);
+  const [selectedPet, setSelectedPet] = useState(null);
   const [petModalVisible, setPetModalVisible] = useState(false);
-
   const [region, setRegion] = useState(null);
   const [marker, setMarker] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
@@ -48,6 +45,12 @@ export default function CreatePost({ pets = DEFAULT_PETS, onSubmit }) {
       await ImagePicker.requestMediaLibraryPermissionsAsync();
     })();
   }, []);
+
+  useEffect(() => {
+    if (!loadingPets && !errorPets && pets.length > 0) {
+      setSelectedPet(pets[0].mascota_id || pets[0].id);
+    }
+  }, [loadingPets, errorPets, pets]);
 
   const detectTypeFromUri = (uri) => {
     if (!uri) return { type: 'unknown', ext: '' };
@@ -236,7 +239,7 @@ export default function CreatePost({ pets = DEFAULT_PETS, onSubmit }) {
 
       <Text className="text-lg font-semibold mb-2">Seleccionar mascota</Text>
       <TouchableOpacity className="border border-gray-300 rounded-lg p-3 mb-4" onPress={() => setPetModalVisible(true)}>
-        <Text>{(pets.find((p) => p.id === selectedPet) || {}).name || 'Selecciona una mascota'}</Text>
+        <Text>{(pets.find((p) => (p.mascota_id || p.id) === selectedPet) || {}).nombre || (pets.find((p) => (p.mascota_id || p.id) === selectedPet) || {}).name || 'Selecciona una mascota'}</Text>
       </TouchableOpacity>
 
       <View className="flex-row justify-between">
@@ -299,18 +302,34 @@ export default function CreatePost({ pets = DEFAULT_PETS, onSubmit }) {
         </View>
 
         {/* Pet selector modal */}
-        <Modal visible={petModalVisible} animationType="slide" transparent>
-          <View className="flex-1 justify-end bg-black/30">
-            <View className="bg-white p-4 rounded-t-xl max-h-72">
-              <Text className="text-lg font-semibold mb-2">Selecciona mascota</Text>
+        <Modal visible={petModalVisible} animationType="fade" transparent>
+          <View className="flex-1 justify-center items-center bg-black/50">
+            <View className="bg-white p-4 rounded-xl max-w-xs w-full max-h-96">
+              <View className="flex-row justify-between items-center mb-4">
+                <Text className="text-lg font-semibold">Selecciona mascota</Text>
+                <Pressable
+                  onPress={() => setPetModalVisible(false)}
+                  className="bg-[#5bbbe8] px-3 py-1 rounded-lg"
+                >
+                  <Text className="text-white">Cerrar</Text>
+                </Pressable>
+              </View>
               <FlatList
                 data={pets}
-                keyExtractor={(i) => i.id}
+                keyExtractor={(item, index) => item.mascota_id?.toString() || item.id?.toString() || index.toString()}
                 renderItem={({ item }) => (
-                  <Pressable>
-                    <Text>{item.name}</Text>
+                  <Pressable
+                    className="p-3 border-b border-gray-200"
+                    onPress={() => {
+                      setSelectedPet(item.mascota_id || item.id);
+                      setPetModalVisible(false);
+                    }}
+                  >
+                    <Text className="text-gray-800">{item.nombre || item.name}</Text>
                   </Pressable>
                 )}
+                ListEmptyComponent={<Text className="text-gray-500">No hay mascotas disponibles</Text>} // Handle empty pets array
+                style={{ maxHeight: '100%' }}
               />
             </View>
           </View>

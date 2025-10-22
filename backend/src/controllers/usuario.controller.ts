@@ -5,7 +5,11 @@ import { getUserById,updateUser,deleteUser,getPetsByUserId,changePassword} from 
 export class UsuarioController {
   static async getUser(req: Request, res: Response) {
     try {
-      const userFromToken = await getUserFromToken(req.body.token);
+      const token = req.headers.authorization?.split(' ')[1];
+      if (!token) {
+        return res.status(401).json({ message: "Token no proporcionado" });
+      }
+      const userFromToken = await getUserFromToken(token);
       if (!userFromToken) {
         return res.status(401).json({ message: "Token inválido" });
       }
@@ -21,7 +25,11 @@ export class UsuarioController {
 
   static async updateUser(req: Request, res: Response) {
     try {
-      const userFromToken = await getUserFromToken(req.body.token);
+      const token = req.headers.authorization?.split(' ')[1];
+      if (!token) {
+        return res.status(401).json({ message: "Token no proporcionado" });
+      }
+      const userFromToken = await getUserFromToken(token);
       if (!userFromToken) {
         return res.status(401).json({ message: "Token inválido" });
       }
@@ -36,10 +44,14 @@ export class UsuarioController {
   }
     static async deleteUser(req: Request, res: Response) {
     try {
-      const userFromToken = await getUserFromToken(req.body.token);
+      const token = req.headers.authorization?.split(' ')[1];
+        if (!token) {
+        return res.status(401).json({ message: "Token no proporcionado" });
+        }   
+        const userFromToken = await getUserFromToken(token);
         if (!userFromToken) {
         return res.status(401).json({ message: "Token inválido" });
-        }   
+        }
         const success = await deleteUser(userFromToken.usuario_id);
         if (!success) {
         return res.status(404).json({ message: "Usuario no encontrado" });
@@ -51,13 +63,20 @@ export class UsuarioController {
   }
   static async getPets(req: Request, res: Response) {
     try {
-      const userFromToken = await getUserFromToken(req.body.token); 
+      const token = req.headers.authorization?.split(' ')[1];
+      if (!token) {
+        return res.status(401).json({ message: "Token no proporcionado" });
+      }
+      const userFromToken = await getUserFromToken(token); 
         if (!userFromToken) {
         return res.status(401).json({ message: "Token inválido" });
         }
         const pets =  await getPetsByUserId(userFromToken.usuario_id);
+        //debug
+        console.log(pets);
         return res.json(pets);
     } catch (error: any) {
+      console.error(error);
       return res.status(500).json({ message: error.message || "Error al obtener las mascotas" });
     }
     }

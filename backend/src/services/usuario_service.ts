@@ -1,6 +1,6 @@
-import { Usuario } from "entities";
-import { Mascota } from "entities"; 
-import { AppDataSource } from "data-source";
+import { Usuario } from "../entities";
+import { Mascota } from "../entities"; 
+import { AppDataSource } from "../data-source";
 
 export async function getUserById(id: number): Promise<Usuario | null> {
   const usuarioRepository = AppDataSource.getRepository(Usuario);
@@ -30,16 +30,19 @@ export async function changePassword(id: number, newPassword: string): Promise<v
 export async function getPetsByUserId(userId: number): Promise<Mascota[]> {
   const mascotaRepository = AppDataSource.getRepository(Mascota);
   const userRepository = AppDataSource.getRepository(Usuario);
+  
   const user = await userRepository.findOneBy({ usuario_id: userId });
   if (!user) {
     throw new Error("Usuario no encontrado");
   }
+  
   const mascotas = await mascotaRepository.find({
     where: { usuario: user },
-    relations: ['mascotas'],
   });
+  
   if (!mascotas || mascotas.length === 0) {
     throw new Error("No hay mascotas para este usuario");
   }
+  
   return mascotas;
 }

@@ -1,5 +1,5 @@
-import { AppDataSource } from "data-source";
-import { Mascota, Publicacion } from "entities";
+import { AppDataSource } from "../data-source";
+import { Mascota, Publicacion } from "../entities";
 
 export async function createPost(ubicacion_lon: number, ubicacion_lat: number, descripcion: string, id: number, mascota: Mascota, id_video: string, mime_type: string, size_bytes: string): Promise<void> {
     const postRepository = AppDataSource.getRepository(Publicacion);

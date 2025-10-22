@@ -11,6 +11,9 @@ export class Mascota {
   mascota_id!: number;
   
   @Column({ type: 'text', nullable: true })
+  nombre!: string | null;
+
+  @Column({ type: 'text', nullable: true })
   descripcion!: string | null;
 
   @ManyToOne(() => Usuario, (u: Usuario) => u.mascotas, { nullable: false, onDelete: 'CASCADE' })
