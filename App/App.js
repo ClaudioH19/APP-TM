@@ -48,6 +48,8 @@ export default function App() {
         <Stack.Screen name="Login" component={Login} options={{ headerShown: false }} />
         <Stack.Screen name="Register" component={Register} options={{ title: 'Registro' }} />
         <Stack.Screen name="Home" component={HomeComponent} options={{  headerRight: () => <Header navigation={navigationRef.current} /> }} />
+        <Stack.Screen name="CreatePost" component={CreatePost} options={{ title: 'Crear Publicación' }} />
+        <Stack.Screen name="Map" component={MapComponent} options={{ title: 'Mapa' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
