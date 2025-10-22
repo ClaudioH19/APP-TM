@@ -263,10 +263,10 @@ export default function CreatePost({onSubmit }) {
           <Text className="mt-2">Obteniendo ubicación...</Text>
         </View>
       ) : (
-        <View className="flex-1 rounded-lg overflow-hidden">
+        <View className="rounded-lg overflow-hidden max-h-96 h-96">
           <MapView
             ref={mapRef}
-            style={{ width: width - 16, height: height * 0.55 }}
+            style={{ width: width - 16, height: 384 }}
             initialRegion={region}
             onPress={onMapPress}
             showsUserLocation
@@ -284,7 +284,7 @@ export default function CreatePost({onSubmit }) {
         </View>
       )}
 
-      <View className="flex-row justify-between mt-4">
+      <View className="flex-row justify-between mt-4 px-2">
         <TouchableOpacity className="bg-gray-200 px-4 py-2 rounded-lg" onPress={() => setStep(1)}>
           <Text>Volver</Text>
         </TouchableOpacity>
