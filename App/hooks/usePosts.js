@@ -29,7 +29,10 @@ export function usePosts(apiUrl) {
         if (isMounted) setPosts(enriched);
       })
       .catch(err => {
-        if (isMounted) setError(err.message);
+        if (isMounted) {
+          console.error('Error fetching posts:', err); // Log detailed error
+          setError(`Failed to fetch posts: ${err.message}`); // Include reason in error state
+        }
       })
       .finally(() => {
         if (isMounted) setLoading(false);
