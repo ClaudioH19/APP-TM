@@ -21,11 +21,13 @@ import * as Location from 'expo-location';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
 import { API_ENDPOINTS } from '../config/api';
 import usePets from '../hooks/usePets';
+import { usePosts } from '../hooks/usePosts';
 const { width, height } = Dimensions.get('window');
 
 
 export default function CreatePost({onSubmit }) {
   const { pets, loading: loadingPets, error: errorPets } = usePets(API_ENDPOINTS.PETS);
+  const { createPost, creating } = usePosts();
   const [step, setStep] = useState(1);
   const [description, setDescription] = useState('');
   const [mediaUri, setMediaUri] = useState(null);
@@ -165,7 +167,7 @@ export default function CreatePost({onSubmit }) {
     setMarker({ latitude, longitude });
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!description.trim()) return Alert.alert('Validación', 'Agrega una descripción');
     if (!mediaUri) return Alert.alert('Validación', 'Sube una foto o video');
     if (!selectedPet) return Alert.alert('Validación', 'Selecciona una mascota');
@@ -178,8 +180,23 @@ export default function CreatePost({onSubmit }) {
       location: marker,
     };
 
-    if (onSubmit) onSubmit(payload);
-    else Alert.alert('Publicación', 'Publicación creada (simulada)');
+    try {
+      const result = await createPost(payload);
+      Alert.alert('Éxito', 'Publicación creada correctamente');
+      
+      // Reset form
+      setDescription('');
+      setMediaUri(null);
+      setMediaType(null);
+      setMediaExt('');
+      setSelectedPet(pets.length > 0 ? pets[0].mascota_id || pets[0].id : null);
+      setMarker(null);
+      setStep(1);
+      
+      if (onSubmit) onSubmit(result);
+    } catch (error) {
+      Alert.alert('Error', error.message || 'No se pudo crear la publicación');
+    }
   };
 
   // Step 1 UI
@@ -288,8 +305,16 @@ export default function CreatePost({onSubmit }) {
         <TouchableOpacity className="bg-gray-200 px-4 py-2 rounded-lg" onPress={() => setStep(1)}>
           <Text>Volver</Text>
         </TouchableOpacity>
-        <TouchableOpacity className="bg-[#5bbbe8] px-4 py-2 rounded-lg" onPress={submit}>
-          <Text className="text-white">Publicar</Text>
+        <TouchableOpacity 
+          className="bg-[#5bbbe8] px-4 py-2 rounded-lg" 
+          onPress={submit}
+          disabled={creating}
+        >
+          {creating ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text className="text-white">Publicar</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>

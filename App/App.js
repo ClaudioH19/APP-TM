@@ -9,11 +9,25 @@ import Register from './components/Register';
 import Header from './components/Header';
 import CreatePost from './components/CreatePost';
 import MapComponent from './components/MapComponent';
+import ScreenWrapper from './components/ScreenWrapper';
 import "./global.css";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_ENDPOINTS } from './config/api';
 
 const Stack = createNativeStackNavigator();
+
+// Wrapper components para las pantallas que necesitan Footer
+const HomeScreen = () => (
+  <ScreenWrapper showHeader={true}>
+    <HomeComponent />
+  </ScreenWrapper>
+);
+
+const MapScreen = () => (
+  <ScreenWrapper showHeader={true}>
+    <MapComponent />
+  </ScreenWrapper>
+);
 
 export default function App() {
   const navigationRef = useRef(null);
@@ -47,9 +61,9 @@ export default function App() {
       <Stack.Navigator initialRouteName="Login">
         <Stack.Screen name="Login" component={Login} options={{ headerShown: false }} />
         <Stack.Screen name="Register" component={Register} options={{ title: 'Registro' }} />
-        <Stack.Screen name="Home" component={HomeComponent} options={{  headerRight: () => <Header navigation={navigationRef.current} /> }} />
+        <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
         <Stack.Screen name="CreatePost" component={CreatePost} options={{ title: 'Crear Publicación' }} />
-        <Stack.Screen name="Map" component={MapComponent} options={{ title: 'Mapa' }} />
+        <Stack.Screen name="Map" component={MapScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
