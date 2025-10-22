@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import HomeComponent from './components/HomeComponent';
 import Login from './components/Login';
 import Register from './components/Register';
-import Header from './components/Header';
+import Header from './components/Header'; // <-- Importa tu Header
 import MapComponent from './components/MapComponent';
 import "./global.css";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,10 +28,8 @@ export default function App() {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (resp.ok) {
-            // Navega a Home si token válido
             navigationRef.current?.navigate('Home');
           } else {
-            // token inválido -> limpiar
             await AsyncStorage.removeItem('token');
           }
         }
@@ -51,11 +49,23 @@ export default function App() {
             <ActivityIndicator size="large" color="#007bff" />
           </View>
         )}
-        <Stack.Navigator initialRouteName="Login">
+        
+        {/* Aquí está el cambio principal */}
+        <Stack.Navigator 
+          initialRouteName="Login"
+          screenOptions={{
+            // Define tu Header como el header global
+            header: (props) => <Header {...props} />
+          }}
+        >
+          {/* Esta pantalla sigue sin header */}
           <Stack.Screen name="Login" component={Login} options={{ headerShown: false }} />
-          <Stack.Screen name="Register" component={Register} options={{ title: 'Registro' }} />
-          <Stack.Screen name="Map" component={MapComponent} options={{ title: 'Mapa' }} />
-          <Stack.Screen name="Home" component={HomeComponent} options={{  headerRight: () => <Header /> }} />
+          
+          {/* Estas pantallas usarán automáticamente tu Header global */}
+          <Stack.Screen name="Register" component={Register} />
+          <Stack.Screen name="Map" component={MapComponent} />
+          <Stack.Screen name="Home" component={HomeComponent} />
+
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
@@ -65,7 +75,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
