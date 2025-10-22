@@ -4,6 +4,7 @@ import { Recorrido } from './Recorrido';
 import { Publicacion } from './Publicacion';
 import { Comentario } from './Comentario';
 import { Resena } from './Resena';
+import { PuntoDeInteres } from './PuntoDeInteres';
 
 @Entity('usuario')
 export class Usuario {
@@ -41,4 +42,7 @@ export class Usuario {
 
   @OneToMany(() => Resena, (r: Resena) => r.usuario)
   resenas!: Resena[];
+
+  @OneToMany(() => PuntoDeInteres, (pdi) => pdi.usuario)
+  puntosDeInteresCreados!: PuntoDeInteres[];
 }

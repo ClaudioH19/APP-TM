@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, JoinColumn, ManyToOne } from 'typeorm';
 import { Resena } from './Resena';
-import { CategoriaInterestPoint } from './enums/nterest_point_categoria.enum';
+import { CategoriaInterestPoint } from './enums/Interest_point_categoria.enum';
+import { Usuario } from './Usuario';
 
 @Entity('punto_de_interes')
 export class PuntoDeInteres {
@@ -15,6 +16,10 @@ export class PuntoDeInteres {
 
   @Column({ type: 'float', nullable: true })
   latitud!: number | null;
+
+  @ManyToOne(() => Usuario, (u) => u.puntosDeInteresCreados, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'usuario_id' })
+  usuario!: Usuario;
 
   @Column({ type: 'timestamp', nullable: true })
   fecha_creacion!: Date | null;
