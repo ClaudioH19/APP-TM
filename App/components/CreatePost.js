@@ -273,9 +273,11 @@ export default function CreatePost({onSubmit }) {
           >
             {/* OpenStreetMap tiles via UrlTile */}
             <UrlTile
-              urlTemplate="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              urlTemplate="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               maximumZ={19}
               flipY={false}
+              tileSize={256}
+              subdomains={["a", "b", "c"]}
             />
             {marker ? <Marker coordinate={marker} /> : null}
           </MapView>
