@@ -19,7 +19,6 @@ app.set('dataSource', AppDataSource);
 
 // Usar rutas
 app.use('/api', routes);
-app.use('/auth', authRouter);
 
 // Nota: La conexión ahora usa env.DB_URL vía data-source.ts
 
