@@ -3,6 +3,7 @@ import authRouter from './auth';
 import publicationRouter from './publication';
 import interestPointRouter from './interest_point'; 
 import reviewRouter from './review'; 
+import usuarioRouter from './usuarios';
 const router = Router();
 
 
@@ -18,5 +19,6 @@ router.use('/publications', publicationRouter);
 router.use('/interest_points', interestPointRouter);
 // Rutas de reseñas
 router.use('/reviews', reviewRouter);
+router.use('/usuarios', usuarioRouter);
 
 export default router;

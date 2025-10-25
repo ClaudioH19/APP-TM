@@ -22,6 +22,10 @@ export class Publicacion {
 
   @Column({ type: 'int', nullable: true })
   contador_likes!: number | null;
+  @Column({ type: 'int', nullable: true })
+  contador_comentarios!: number | null;
+  @Column({ type: 'int', nullable: true })
+  contador_compartidos!: number | null;
 
   @Column({ type: 'text', nullable: true })
   id_video!: string | null;

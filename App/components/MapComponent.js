@@ -92,8 +92,6 @@ const MapComponent = () => {
         )}
       </MapView>
 
-      {/* Footer al final, gestiona su propio safe area (edges=['left','right','bottom']) */}
-      <Footer />
     </View>
   );
 };

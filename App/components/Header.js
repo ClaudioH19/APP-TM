@@ -2,10 +2,11 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft } from 'lucide-react-native'; // Importa el ícono de "atrás"
+import { useNavigation } from '@react-navigation/native'; // Importa el hook de navegación
 
-// Acepta 'navigation' y 'route' desde las props
-const Header = ({ navigation, route }) => {
-    
+const Header = () => {
+    const navigation = useNavigation(); // Use navigation hook
+
     // Revisa si el navegador puede retroceder
     const canGoBack = navigation.canGoBack();
 
@@ -13,7 +14,6 @@ const Header = ({ navigation, route }) => {
         // El SafeAreaView maneja el padding superior (barra de estado)
         <SafeAreaView className="bg-white" edges={['top', 'left', 'right']}>
             <View className="bg-white px-4 py-3 flex-row items-center justify-between">
-                
                 {/* Lado Izquierdo: Botón "Atrás" o un espacio vacío */}
                 <View className="w-8">
                   {canGoBack && (
@@ -38,4 +38,5 @@ const Header = ({ navigation, route }) => {
         </SafeAreaView>
     );
 };
+
 export default Header;

@@ -17,6 +17,7 @@ export class InitSchema1700000000000 implements MigrationInterface {
     await queryRunner.query(`
       CREATE TABLE mascota (
         mascota_id  SERIAL PRIMARY KEY,
+        nombre     TEXT,
         descripcion TEXT,
         usuario_id  INT NOT NULL REFERENCES usuario(usuario_id)
       );
@@ -60,6 +61,8 @@ export class InitSchema1700000000000 implements MigrationInterface {
         ubicacion_lon    FLOAT,
         descripcion      TEXT,
         contador_likes   INT,
+        contador_comentarios INT,
+        contador_compartidos INT,
         id_video         TEXT,
         provider         TEXT,
         mime_type        TEXT,

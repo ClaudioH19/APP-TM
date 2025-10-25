@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, Image, Pressable } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, Image, Pressable, ActivityIndicator } from 'react-native';
+import { Volume2, VolumeX } from 'lucide-react-native';
 import { Heart, MessageCircle, Share2 } from 'lucide-react-native';
 import { API_ENDPOINTS } from '../config/api';
+import { Video } from 'expo-av';
 import { Svg, Circle, Text as SvgText } from 'react-native-svg';
 
 const Dot = ({ color = 'bg-gray-600' }) => (
@@ -29,6 +31,9 @@ export const PostCard = ({ post }) => {
   const [likeCount, setLikeCount] = useState(post.contador_likes ?? 0);
   const [commentCount, setCommentCount] = useState(post.contador_comentarios ?? 0);
   const [shareCount, setShareCount] = useState(post.contador_compartidos ?? 0);
+  const videoRef = useRef(null);
+  const [muted, setMuted] = useState(true);
+  const toggleMute = () => setMuted(m => !m);
 
   const toggleLike = () => {
     setLiked(prev => !prev);
@@ -78,15 +83,91 @@ export const PostCard = ({ post }) => {
         </View>
       ) : null}
 
-      {/* Image */}
+      {/* Media: image or video */}
       {post?.id_video ? (
         <View className="w-full bg-gray-200 relative">
-          <Image
-            source={{ uri: API_ENDPOINTS.MEDIA + "/" + post.id_video }}
-            alt="Post"
-            style={{ width: '100%', height: undefined, aspectRatio: 4 / 3 }}
-            className="object-cover"
-          />
+          {(() => {
+            // Decide if media is video by mime_type or extension
+            const mime = (post.mime_type || '').toLowerCase();
+            const id = post.id_video || '';
+
+            // Map for mime -> extension
+            const mimeToExt = {
+              'image/jpeg': 'jpeg',
+              'image/jpg': 'jpg',
+              'image/png': 'png',
+              'image/webp': 'webp',
+              'image/heic': 'heic',
+              'image/gif': 'gif',
+              'video/mp4': 'mp4',
+              'video/quicktime': 'mov',
+              'video/x-m4v': 'm4v',
+              'video/webm': 'webm',
+              'video/x-msvideo': 'avi',
+              'video/3gpp': '3gp',
+            };
+
+            // Determine extension prioritizing mime_type (if provided)
+            let ext = '';
+            if (mime) {
+              // Use full mime match first, otherwise check prefix
+              ext = mimeToExt[mime] || '';
+              if (!ext) {
+                if (mime.startsWith('video')) ext = 'mp4';
+                else if (mime.startsWith('image')) ext = 'jpg';
+              }
+            }
+
+            // If mime didn't give us ext, try extracting from id if it contains a dot
+            if (!ext && id.includes('.')) {
+              ext = id.split('.').pop().toLowerCase();
+            }
+
+            // Decide if resource is video
+            const videoExts = ['mp4', 'mov', 'm4v', '3gp', 'webm', 'avi'];
+            const isVideo = mime.startsWith('video') || videoExts.includes(ext);
+
+            // Reconstruct filename: if id already contains extension, use as-is; otherwise append ext when available
+            const fileName = id.includes('.') || !ext ? id : `${id}.${ext}`;
+            const uri = `${API_ENDPOINTS.MEDIA}/${fileName}`;
+
+            if (isVideo) {
+              return (
+                <View style={{ width: '100%' }}>
+                  <Video
+                    ref={videoRef}
+                    source={{ uri }}
+                    style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' }}
+                    resizeMode="cover"
+                    isLooping={true}
+                    shouldPlay={true}
+                    isMuted={muted}
+                    useNativeControls={true}
+                  />
+                  <Pressable
+                    onPress={toggleMute}
+                    style={{ position: 'absolute', bottom: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 6 }}
+                  >
+                    {muted ? (
+                      <VolumeX size={22} color="#fff" />
+                    ) : (
+                      <Volume2 size={22} color="#fff" />
+                    )}
+                  </Pressable>
+                </View>
+              );
+            }
+
+            // fallback to image
+            return (
+              <Image
+                source={{ uri }}
+                alt="Post"
+                style={{ width: '100%', height: undefined, aspectRatio: 4 / 3 }}
+                className="object-cover"
+              />
+            );
+          })()}
         </View>
       ) : null}
 

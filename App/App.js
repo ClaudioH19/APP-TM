@@ -6,13 +6,28 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import HomeComponent from './components/HomeComponent';
 import Login from './components/Login';
 import Register from './components/Register';
-import Header from './components/Header'; // <-- Importa tu Header
+import Header from './components/Header';
+import CreatePost from './components/CreatePost';
 import MapComponent from './components/MapComponent';
+import ScreenWrapper from './components/ScreenWrapper';
 import "./global.css";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_ENDPOINTS } from './config/api';
 
 const Stack = createNativeStackNavigator();
+
+// Wrapper components para las pantallas que necesitan Footer
+const HomeScreen = () => (
+  <ScreenWrapper showHeader={true}>
+    <HomeComponent />
+  </ScreenWrapper>
+);
+
+const MapScreen = () => (
+  <ScreenWrapper showHeader={true}>
+    <MapComponent />
+  </ScreenWrapper>
+);
 
 export default function App() {
   const navigationRef = useRef(null);
@@ -42,33 +57,15 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <NavigationContainer ref={navigationRef}>
-        {checkingAuth && (
-          <View style={{ position: 'absolute', left:0,right:0,top:0,bottom:0,justifyContent:'center',alignItems:'center',zIndex:999 }}>
-            <ActivityIndicator size="large" color="#007bff" />
-          </View>
-        )}
-        
-        {/* Aquí está el cambio principal */}
-        <Stack.Navigator 
-          initialRouteName="Login"
-          screenOptions={{
-            // Define tu Header como el header global
-            header: (props) => <Header {...props} />
-          }}
-        >
-          {/* Esta pantalla sigue sin header */}
-          <Stack.Screen name="Login" component={Login} options={{ headerShown: false }} />
-          
-          {/* Estas pantallas usarán automáticamente tu Header global */}
-          <Stack.Screen name="Register" component={Register} />
-          <Stack.Screen name="Map" component={MapComponent} />
-          <Stack.Screen name="Home" component={HomeComponent} />
-
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Login">
+        <Stack.Screen name="Login" component={Login} options={{ headerShown: false }} />
+        <Stack.Screen name="Register" component={Register} options={{ title: 'Registro' }} />
+        <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="CreatePost" component={CreatePost} options={{ title: 'Crear Publicación' }} />
+        <Stack.Screen name="Map" component={MapScreen} options={{ headerShown: false }} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
 
