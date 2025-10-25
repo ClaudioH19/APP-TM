@@ -233,16 +233,16 @@ const MapComponent = () => {
         </View>
       )}
 
-      {/* Botón flotante para activar modo creación */}
+      {/* Botón flotante circular para activar modo creación */}
       {!createMode && (
         <TouchableOpacity
-          style={styles.createButton}
+          style={styles.createButtonFAB}
           onPress={handleActivateCreateMode}
         >
-          <MapPin size={20} color="#fff" />
-          <Text style={styles.createButtonText}>Crear punto de interés</Text>
+          <MapPin size={24} color="#fff" />
         </TouchableOpacity>
       )}
+    
 
       {/* Botones de acción en modo creación */}
       {createMode && (
@@ -312,28 +312,21 @@ const styles = StyleSheet.create({
     marginTop: -40,
     zIndex: 1,
   },
-  createButton: {
+  createButtonFAB: {
     position: 'absolute',
     top: 16,
-    left: 16,
     right: 16,
     backgroundColor: '#3b82f6',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
+    borderRadius: 50, // Hace el botón circular
+    width: 56,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-  },
-  createButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
   },
   actionButtons: {
     position: 'absolute',
