@@ -98,15 +98,29 @@ export class PublicationController {
                     if (!fs.existsSync(mediaDir)) {
                         fs.mkdirSync(mediaDir, { recursive: true });
                     }
-                    
-                    // Usar exactamente el mismo nombre que en Cloudinary: id_video
-                    const fileName = id_video; // Sin extensión, igual que en Cloudinary
+
+                    // Determinar extensión: preferir originalname, si no usar mime_type
+                    const originalName = (req.file.originalname || '').toString();
+                    let ext = '';
+                    if (originalName) {
+                        ext = path.extname(originalName);
+                    }
+                    if (!ext && mime_type) {
+                        // Inferir por mime_type básico
+                        if (mime_type.includes('mp4') || mime_type.includes('video')) ext = '.mp4';
+                        else if (mime_type.includes('jpeg') || mime_type.includes('jpg')) ext = '.jpg';
+                        else if (mime_type.includes('png')) ext = '.png';
+                        else ext = ''; // dejar vacío si no se sabe
+                    }
+
+                    // Usar nombre con extensión para que Cloudinary detecte correctamente el tipo
+                    const fileName = ext ? `${id_video}${ext}` : id_video;
                     localFilePath = path.join(mediaDir, fileName);
-                    
+
                     // Guardar el archivo localmente
                     fs.writeFileSync(localFilePath, req.file.buffer);
                     console.log('File saved locally at:', localFilePath);
-                    
+
                 } catch (saveError) {
                     console.error('Error saving file locally:', saveError);
                     // Continuar sin fallar la creación del post

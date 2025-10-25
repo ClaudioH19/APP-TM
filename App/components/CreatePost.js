@@ -22,10 +22,16 @@ import MapView, { Marker, UrlTile } from 'react-native-maps';
 import { API_ENDPOINTS } from '../config/api';
 import usePets from '../hooks/usePets';
 import { usePosts } from '../hooks/usePosts';
+import Success from './SuccessExpoGo';
+import Failed from './FailedExpoGo';
+import Loading from './LoadingExpoGo';
+import { useNavigation } from '@react-navigation/native';
+
 const { width, height } = Dimensions.get('window');
 
 
 export default function CreatePost({onSubmit }) {
+  const navigation = useNavigation();
   const { pets, loading: loadingPets, error: errorPets } = usePets(API_ENDPOINTS.PETS);
   const { createPost, creating } = usePosts();
   const [step, setStep] = useState(1);
@@ -38,6 +44,12 @@ export default function CreatePost({onSubmit }) {
   const [region, setRegion] = useState(null);
   const [marker, setMarker] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
+  
+  // Estados para los componentes de feedback
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showFailed, setShowFailed] = useState(false);
+  const [showLoading, setShowLoading] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState('');
 
   const mapRef = useRef(null);
 
@@ -82,7 +94,8 @@ export default function CreatePost({onSubmit }) {
       }
     } catch (err) {
       console.error(err);
-      Alert.alert('Error', 'No se pudo seleccionar el archivo');
+      setFeedbackMessage('No se pudo seleccionar el archivo');
+      setShowFailed(true);
     }
   };
 
@@ -90,15 +103,18 @@ export default function CreatePost({onSubmit }) {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permiso denegado', 'Activa permisos de cámara para tomar fotos');
+        setFeedbackMessage('Activa permisos de cámara para tomar fotos');
+        setShowFailed(true);
         return;
       }
       // default to photo capture unless mediaType 'video' passed via param
       // we'll interpret targetType from an outer param by binding or wrapper
-      Alert.alert('Info', 'Usa los botones específicos para Foto o Vídeo');
+      setFeedbackMessage('Usa los botones específicos para Foto o Vídeo');
+      setShowFailed(true);
     } catch (err) {
       console.error(err);
-      Alert.alert('Error', 'No se pudo abrir la cámara');
+      setFeedbackMessage('No se pudo abrir la cámara');
+      setShowFailed(true);
     }
   };
 
@@ -107,7 +123,8 @@ export default function CreatePost({onSubmit }) {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permiso denegado', 'Activa permisos de cámara para tomar fotos o vídeos');
+        setFeedbackMessage('Activa permisos de cámara para tomar fotos o vídeos');
+        setShowFailed(true);
         return;
       }
       const options = {
@@ -128,7 +145,8 @@ export default function CreatePost({onSubmit }) {
       }
     } catch (err) {
       console.error(err);
-      Alert.alert('Error', 'No se pudo abrir la cámara');
+      setFeedbackMessage('No se pudo abrir la cámara');
+      setShowFailed(true);
     }
   };
 
@@ -138,7 +156,8 @@ export default function CreatePost({onSubmit }) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permiso denegado', 'Activa permisos de ubicación para seleccionar la ubicación en el mapa');
+        setFeedbackMessage('Activa permisos de ubicación para seleccionar la ubicación en el mapa');
+        setShowFailed(true);
         setLoadingLocation(false);
         return;
       }
@@ -168,10 +187,27 @@ export default function CreatePost({onSubmit }) {
   };
 
   const submit = async () => {
-    if (!description.trim()) return Alert.alert('Validación', 'Agrega una descripción');
-    if (!mediaUri) return Alert.alert('Validación', 'Sube una foto o video');
-    if (!selectedPet) return Alert.alert('Validación', 'Selecciona una mascota');
-    if (!marker) return Alert.alert('Validación', 'Selecciona una ubicación en el mapa');
+    // Validaciones
+    if (!description.trim()) {
+      setFeedbackMessage('Agrega una descripción');
+      setShowFailed(true);
+      return;
+    }
+    if (!mediaUri) {
+      setFeedbackMessage('Sube una foto o video');
+      setShowFailed(true);
+      return;
+    }
+    if (!selectedPet) {
+      setFeedbackMessage('Selecciona una mascota');
+      setShowFailed(true);
+      return;
+    }
+    if (!marker) {
+      setFeedbackMessage('Selecciona una ubicación en el mapa');
+      setShowFailed(true);
+      return;
+    }
 
     const payload = {
       description: description.trim(),
@@ -181,21 +217,37 @@ export default function CreatePost({onSubmit }) {
     };
 
     try {
+      // Mostrar loading mientras se crea el post
+      setShowLoading(true);
+      
       const result = await createPost(payload);
-      Alert.alert('Éxito', 'Publicación creada correctamente');
       
-      // Reset form
-      setDescription('');
-      setMediaUri(null);
-      setMediaType(null);
-      setMediaExt('');
-      setSelectedPet(pets.length > 0 ? pets[0].mascota_id || pets[0].id : null);
-      setMarker(null);
-      setStep(1);
+      // Ocultar loading y mostrar éxito
+      setShowLoading(false);
+      setShowSuccess(true);
       
-      if (onSubmit) onSubmit(result);
+      // Reset form después de un delay
+      setTimeout(() => {
+        setDescription('');
+        setMediaUri(null);
+        setMediaType(null);
+        setMediaExt('');
+        setSelectedPet(pets.length > 0 ? pets[0].mascota_id || pets[0].id : null);
+        setMarker(null);
+        setStep(1);
+        setShowSuccess(false);
+        if (onSubmit) onSubmit(result);
+        navigation.navigate('Home');
+      }, 2000);
+      
     } catch (error) {
-      Alert.alert('Error', error.message || 'No se pudo crear la publicación');
+      setShowLoading(false);
+      setFeedbackMessage(error.message || 'No se pudo crear la publicación');
+      setShowFailed(true);
+      setTimeout(() => {
+        setShowFailed(false);
+        navigation.navigate('Home');
+      }, 2000);
     }
   };
 
@@ -324,7 +376,6 @@ export default function CreatePost({onSubmit }) {
     <SafeAreaView className="flex-1 bg-white">
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
         <View className="p-4 flex-1">
-          <Text className="text-2xl font-semibold mb-4">Crear publicación</Text>
           {step === 1 ? StepOne : StepTwo}
         </View>
 
@@ -361,6 +412,25 @@ export default function CreatePost({onSubmit }) {
             </View>
           </View>
         </Modal>
+
+        {/* Feedback modals */}
+        <Success 
+          visible={showSuccess}
+          title="¡Éxito!"
+          message="Publicación creada correctamente"
+          onClose={() => setShowSuccess(false)}
+        />
+        <Failed 
+          visible={showFailed}
+          title="Error"
+          message={feedbackMessage}
+          onClose={() => setShowFailed(false)}
+        />
+        <Loading 
+          visible={showLoading}
+          title="Subiendo publicación..."
+          message="Por favor espera mientras procesamos tu publicación"
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

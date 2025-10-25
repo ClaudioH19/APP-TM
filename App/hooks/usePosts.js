@@ -76,15 +76,40 @@ export function usePosts(apiUrl) {
       const formData = new FormData();
       
       // Determinar la extensión del archivo
-      const fileExtension = postData.media.uri.split('.').pop() || (postData.media.type === 'video' ? 'mp4' : 'jpg');
+      const fileExtension = (postData.media.uri.split('.').pop() || (postData.media.type === 'video' ? 'mp4' : 'jpg')).toLowerCase();
       const fileName = `${fileId}.${fileExtension}`;
-      
-      console.log('File info:', { fileId, fileName, fileExtension });
-      
-      // Añadir el archivo al FormData
+
+      // Mapear extensión a MIME type más preciso
+      const imageMap = {
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        webp: 'image/webp',
+        heic: 'image/heic',
+        gif: 'image/gif',
+      };
+      const videoMap = {
+        mp4: 'video/mp4',
+        mov: 'video/quicktime',
+        m4v: 'video/x-m4v',
+        webm: 'video/webm',
+        avi: 'video/x-msvideo',
+        '3gp': 'video/3gpp',
+      };
+
+      let inferredMime = '';
+      if (postData.media.type === 'video') {
+        inferredMime = videoMap[fileExtension] || 'video/mp4';
+      } else {
+        inferredMime = imageMap[fileExtension] || 'image/jpeg';
+      }
+
+      console.log('File info:', { fileId, fileName, fileExtension, inferredMime });
+
+      // Añadir el archivo al FormData usando el mime correcto
       formData.append('file', {
         uri: postData.media.uri,
-        type: postData.media.type === 'video' ? 'video/mp4' : 'image/jpeg',
+        type: inferredMime,
         name: fileName,
       });
       
@@ -94,7 +119,7 @@ export function usePosts(apiUrl) {
       formData.append('descripcion', postData.description);
       formData.append('mascota_id', postData.petId.toString());
       formData.append('id_video', fileId);
-      formData.append('mime_type', postData.media.type === 'video' ? 'video/mp4' : 'image/jpeg');
+      formData.append('mime_type', inferredMime);
       
       console.log('Making request to:', API_ENDPOINTS.CREATEPOST);
       
