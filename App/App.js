@@ -32,6 +32,7 @@ const MapScreen = () => (
 export default function App() {
   const navigationRef = useRef(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [initialRoute, setInitialRoute] = useState('Login');
 
   useEffect(() => {
     (async () => {
@@ -43,22 +44,30 @@ export default function App() {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (resp.ok) {
-            navigationRef.current?.navigate('Home');
+            setInitialRoute('Home');
           } else {
             await AsyncStorage.removeItem('token');
           }
         }
       } catch (err) {
-        console.warn('Auth check failed', err);
+        // Error silencioso
       } finally {
         setCheckingAuth(false);
       }
     })();
   }, []);
 
+  if (checkingAuth) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#5bbbe8" />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login">
+      <Stack.Navigator initialRouteName={initialRoute}>
         <Stack.Screen name="Login" component={Login} options={{ headerShown: false }} />
         <Stack.Screen name="Register" component={Register} options={{ title: 'Registro' }} />
         <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
