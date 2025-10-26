@@ -117,7 +117,8 @@ const CreatePointModal = ({ visible, onClose, onSubmit, coordinate }) => {
             </View>
 
             {/* Campo: Descripción */}
-            <Text style={styles.label}>Descripción (opcional)</Text>
+            <Text style={styles.label}>Descripción <Text style={styles.required}>*</Text>
+            </Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Describe el lugar..."

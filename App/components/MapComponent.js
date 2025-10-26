@@ -199,21 +199,20 @@ const MapComponent = () => {
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_DEFAULT}
-        region={region}
-        onRegionChangeComplete={setRegion}
+        initialRegion={region}
+        onRegionChangeComplete={(newRegion) => {
+          if (createMode) {
+            setRegion(newRegion);
+          }
+        }}
         showsUserLocation={true}
-        showsMyLocationButton={!createMode} // Ocultar en modo creación
-        followsUserLocation={!createMode} // Desactivar seguimiento en modo creación
+        showsMyLocationButton={!createMode}
+        followsUserLocation={false}
+        rotateEnabled={true}
+        pitchEnabled={true}
       >
-        {/* Marcador de ubicación del usuario */}
-        {!createMode && userLocation && (
-          <Marker
-            coordinate={userLocation}
-            title="Mi ubicación"
-            description="Estás aquí"
-            pinColor="#3b82f6"
-          />
-        )}
+        {/* QUITAR ESTE BLOQUE - ya no renderizar el Marker manual */}
+        {/* El círculo azul de OpenStreetMap ya muestra la ubicación */}
 
         {/* Marcadores de puntos de interés */}
         {!createMode && interestPoints.map((point) => (
@@ -232,7 +231,7 @@ const MapComponent = () => {
         </View>
       )}
 
-      {/* Botón flotante circular para activar modo creación */}
+      {/* Botón flotante circular - MOVIDO A ABAJO A LA DERECHA */}
       {!createMode && (
         <TouchableOpacity
           style={styles.createButtonFAB}
@@ -312,10 +311,10 @@ const styles = StyleSheet.create({
   },
   createButtonFAB: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    bottom: 615,  // Cambiado de top: 16 a bottom: 100 (encima del footer)
+    right: 3,
     backgroundColor: '#3b82f6',
-    borderRadius: 50, // Hace el botón circular
+    borderRadius: 50,
     width: 56,
     height: 56,
     alignItems: 'center',
