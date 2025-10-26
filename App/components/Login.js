@@ -45,14 +45,15 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
 
         if (data.token) {
           await AsyncStorage.setItem('token', data.token);
-          //alert('Éxito', 'Has iniciado sesión correctamente');
-          navigation.navigate('Home');
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Home' }],
+          });
         }
 
         setLoading(false);
         if (onLoginSuccess) onLoginSuccess(data);
       } catch (err) {
-        console.error(err);
         Alert.alert('Error', 'No se pudo conectar al servidor');
         setLoading(false);
       }
