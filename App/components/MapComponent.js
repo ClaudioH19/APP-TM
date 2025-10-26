@@ -199,11 +199,17 @@ const MapComponent = () => {
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_DEFAULT}
-        region={region}
-        onRegionChangeComplete={setRegion}
+        initialRegion={region}
+        onRegionChangeComplete={(newRegion) => {
+          if (createMode) {
+            setRegion(newRegion);
+          }
+        }}
         showsUserLocation={true}
         showsMyLocationButton={!createMode}
-        followsUserLocation={!createMode}
+        followsUserLocation={false}
+        rotateEnabled={true}
+        pitchEnabled={true}
       >
         {/* QUITAR ESTE BLOQUE - ya no renderizar el Marker manual */}
         {/* El círculo azul de OpenStreetMap ya muestra la ubicación */}
