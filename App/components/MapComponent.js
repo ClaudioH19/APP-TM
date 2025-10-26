@@ -3,7 +3,6 @@ import { View, StyleSheet, Alert, ActivityIndicator, Text, TouchableOpacity } fr
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { MapPin, X, Check } from 'lucide-react-native';
-import Footer from './Footer';
 import CustomMarker from './CustomMarker';
 import CreatePointModal from './CreatePointModal';
 import { getInterestPoints, formatPointsForMap, createInterestPoint } from '../services/interestPointsService';
@@ -281,7 +280,6 @@ const MapComponent = () => {
         coordinate={centerCoordinate || { latitude: 0, longitude: 0 }}
       />
 
-      <Footer />
     </View>
   );
 };
