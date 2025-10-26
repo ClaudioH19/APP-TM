@@ -1,19 +1,23 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import { Marker, Callout } from 'react-native-maps';
 
-/**
- * Obtiene el color según la categoría
- */
+// Mapeo de categorías a iconos
+const categoryIcons = {
+  'Veterinario': require('../assets/veterinario.png'),
+  'Tienda': require('../assets/tienda.png'),
+  'Ocio': require('../assets/ocio.png'),
+  'Deporte': require('../assets/deporte.png'),
+  'Otro': require('../assets/otro.png'),
+};
+
 const getCategoryColor = (category) => {
   const colors = {
     'Veterinario': '#ef4444',      // rojo
     'Ocio': '#3b82f6',              // azul
     'Tienda': '#10b981',            // verde
-    'Restaurante': '#f59e0b',       // naranja
-    'Parque': '#22c55e',            // verde claro
-    'Hospital': '#dc2626',          // rojo oscuro
-    'Guardería': '#8b5cf6',         // púrpura
+    'Deporte': '#22c55e',            // verde claro
+    'Otro': '#6b7280',              // gris por defecto
   };
   
   return colors[category] || '#6b7280'; // gris por defecto
@@ -24,12 +28,14 @@ const getCategoryColor = (category) => {
  */
 const CustomMarker = ({ point, onPress }) => {
   const pinColor = getCategoryColor(point.category);
+  const iconSource = categoryIcons[point.category];
 
   return (
     <Marker
       coordinate={point.coordinate}
-      pinColor={pinColor}
       onPress={onPress}
+      image={iconSource}
+      tracksViewChanges={false}
     >
       <Callout tooltip>
         <View style={styles.calloutContainer}>
