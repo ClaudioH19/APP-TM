@@ -17,7 +17,6 @@ const MapComponent = () => {
   const [interestPoints, setInterestPoints] = useState([]);
   const [loadingPoints, setLoadingPoints] = useState(false);
   
-  // Estados para el modo de creación
   const [createMode, setCreateMode] = useState(false);
   const [centerCoordinate, setCenterCoordinate] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -28,10 +27,10 @@ const MapComponent = () => {
 
   useEffect(() => {
     getUserLocation();
-    loadInterestPoints(); // Cargar puntos al montar el componente
+    loadInterestPoints();
   }, []);
 
-  // Actualizar coordenada del centro cuando cambia la región (solo en modo creación)
+  // actualizar coordenada del centro al mover el mapa (solo en modo creación)
   useEffect(() => {
     if (createMode && region) {
       setCenterCoordinate({
@@ -43,7 +42,6 @@ const MapComponent = () => {
 
   const getUserLocation = async () => {
     try {
-      // solicita permisos de ubicación
       const { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
@@ -51,7 +49,6 @@ const MapComponent = () => {
           'Permiso denegado',
           'Se necesita permiso de ubicación para mostrar tu posición en el mapa'
         );
-        // ubicacion por defecto si no se otorgan permisos
         setRegion({
           latitude: -33.4489,
           longitude: -70.6693,
@@ -62,7 +59,6 @@ const MapComponent = () => {
         return;
       }
 
-      // obtiene la ubicación actual
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
@@ -99,10 +95,7 @@ const MapComponent = () => {
       console.log(`✅ Se cargaron ${formattedPoints.length} puntos de interés`);
     } catch (error) {
       console.error('Error cargando puntos de interés:', error);
-      Alert.alert(
-        'Error',
-        'No se pudieron cargar los puntos de interés. Verifica tu conexión.'
-      );
+      Alert.alert('Error', 'No se pudieron cargar los puntos de interés. Verifica tu conexión.');
     } finally {
       setLoadingPoints(false);
     }
@@ -143,14 +136,8 @@ const MapComponent = () => {
       'Confirmar ubicación',
       '¿Deseas crear un punto de interés en esta ubicación?',
       [
-        {
-          text: 'No',
-          style: 'cancel',
-        },
-        {
-          text: 'Sí',
-          onPress: () => setShowCreateModal(true),
-        },
+        { text: 'No', style: 'cancel' },
+        { text: 'Sí', onPress: () => setShowModal(true) },
       ]
     );
   };
@@ -193,11 +180,18 @@ const MapComponent = () => {
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_DEFAULT}
-        region={region}
-        onRegionChangeComplete={setRegion}
+        initialRegion={region}
+        onRegionChangeComplete={(newRegion) => {
+          // solo actualizar región en modo creación para capturar coordenada del centro
+          if (createMode) {
+            setRegion(newRegion);
+          }
+        }}
         showsUserLocation={true}
-        showsMyLocationButton={!createMode}
-        followsUserLocation={!createMode}
+        showsMyLocationButton={!createMode} // ocultar botón GPS en modo creación
+        followsUserLocation={false}
+        rotateEnabled={true}
+        pitchEnabled={true}
       >
         {/* Marcadores de puntos de interés */}
         {!createMode && interestPoints.map((point) => (
@@ -209,14 +203,14 @@ const MapComponent = () => {
         ))}
       </MapView>
 
-      {/* Pin en el centro (solo visible en modo creación) */}
+      {/* pin rojo en el centro del mapa (solo visible en modo creación) */}
       {createMode && (
         <View style={styles.centerMarker}>
           <MapPin size={40} color="#ef4444" fill="#ef4444" />
         </View>
       )}
 
-      {/* Botón flotante circular para activar modo creación */}
+      {/* botón flotante para activar modo creación de puntos */}
       {!createMode && (
         <TouchableOpacity
           style={styles.createButtonFAB}
@@ -226,7 +220,7 @@ const MapComponent = () => {
         </TouchableOpacity>
       )}
 
-      {/* Botones de acción en modo creación */}
+      {/* botones de cancelar y confirmar (solo visibles en modo creación) */}
       {createMode && (
         <View style={styles.actionButtons}>
           <TouchableOpacity
@@ -247,7 +241,7 @@ const MapComponent = () => {
         </View>
       )}
 
-      {/* Indicador de carga de puntos */}
+      {/* indicador de carga en esquina superior derecha */}
       {loadingPoints && (
         <View style={styles.loadingPointsContainer}>
           <ActivityIndicator size="small" color="#3b82f6" />
@@ -303,8 +297,8 @@ const styles = StyleSheet.create({
   },
   createButtonFAB: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    bottom: 615,
+    right: 3,
     backgroundColor: '#3b82f6',
     borderRadius: 50,
     width: 56,
