@@ -16,7 +16,6 @@ import { API_ENDPOINTS } from './config/api';
 
 const Stack = createNativeStackNavigator();
 
-// Wrapper components para las pantallas que necesitan Footer
 const HomeScreen = () => (
   <ScreenWrapper showHeader={true}>
     <HomeComponent />
@@ -35,6 +34,7 @@ export default function App() {
   const [initialRoute, setInitialRoute] = useState('Login');
 
   useEffect(() => {
+    // verificar si existe token guardado al iniciar la app
     (async () => {
       try {
         const token = await AsyncStorage.getItem('token');
@@ -50,7 +50,7 @@ export default function App() {
           }
         }
       } catch (err) {
-        // Error silencioso
+        // silenciar error de verificación
       } finally {
         setCheckingAuth(false);
       }

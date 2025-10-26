@@ -45,6 +45,7 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
 
         if (data.token) {
           await AsyncStorage.setItem('token', data.token);
+          // limpiar stack de navegación para evitar volver atrás
           navigation.reset({
             index: 0,
             routes: [{ name: 'Home' }],
