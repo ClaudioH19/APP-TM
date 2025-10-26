@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Alert, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { MapPin, X, Check } from 'lucide-react-native';
+import Footer from './Footer';
 import CustomMarker from './CustomMarker';
 import CreatePointModal from './CreatePointModal';
+import PointDetailModal from './PointDetailModal';
 import { getInterestPoints, formatPointsForMap, createInterestPoint } from '../services/interestPointsService';
 
 const MapComponent = () => {
@@ -18,7 +20,11 @@ const MapComponent = () => {
   // Estados para el modo de creación
   const [createMode, setCreateMode] = useState(false);
   const [centerCoordinate, setCenterCoordinate] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  
+  // Estados para el modal de detalles
+  const [selectedPoint, setSelectedPoint] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   useEffect(() => {
     getUserLocation();
@@ -74,7 +80,6 @@ const MapComponent = () => {
     } catch (error) {
       console.error('Error obteniendo ubicación:', error);
       Alert.alert('Error', 'No se pudo obtener tu ubicación');
-      // ubicacion por defecto en caso de error
       setRegion({
         latitude: -33.4489,
         longitude: -70.6693,
@@ -85,21 +90,12 @@ const MapComponent = () => {
     }
   };
 
-  /**
-   * Función para cargar los puntos de interés desde la API
-   */
   const loadInterestPoints = async () => {
     setLoadingPoints(true);
     try {
-      // 1. Obtener datos desde la API
       const rawPoints = await getInterestPoints();
-      
-      // 2. Formatear los datos para el mapa
       const formattedPoints = formatPointsForMap(rawPoints);
-      
-      // 3. Guardar en el estado
       setInterestPoints(formattedPoints);
-      
       console.log(`✅ Se cargaron ${formattedPoints.length} puntos de interés`);
     } catch (error) {
       console.error('Error cargando puntos de interés:', error);
@@ -112,13 +108,23 @@ const MapComponent = () => {
     }
   };
 
-  const handleMarkerPress = (point) => {
-    console.log('Marcador presionado:', point.title);
+  /**
+   * Maneja cuando se presiona el callout de un marcador
+   */
+  const handleCalloutPress = (point) => {
+    console.log('Abriendo detalles de:', point.title);
+    setSelectedPoint(point);
+    setShowDetailModal(true);
   };
 
   /**
-   * Activa el modo de creación de puntos
+   * Cierra el modal de detalles
    */
+  const handleCloseDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedPoint(null);
+  };
+
   const handleActivateCreateMode = () => {
     setCreateMode(true);
     setCenterCoordinate({
@@ -127,17 +133,11 @@ const MapComponent = () => {
     });
   };
 
-  /**
-   * Cancela el modo de creación
-   */
   const handleCancelCreateMode = () => {
     setCreateMode(false);
     setCenterCoordinate(null);
   };
 
-  /**
-   * Confirma la ubicación y abre el modal
-   */
   const handleConfirmLocation = () => {
     Alert.alert(
       'Confirmar ubicación',
@@ -149,18 +149,14 @@ const MapComponent = () => {
         },
         {
           text: 'Sí',
-          onPress: () => setShowModal(true),
+          onPress: () => setShowCreateModal(true),
         },
       ]
     );
   };
 
-  /**
-   * Maneja el envío del formulario
-   */
   const handleSubmitPoint = async (pointData) => {
     try {
-      // Crear el punto de interés
       await createInterestPoint(pointData);
       
       Alert.alert(
@@ -170,9 +166,7 @@ const MapComponent = () => {
           {
             text: 'OK',
             onPress: () => {
-              // Recargar los puntos
               loadInterestPoints();
-              // Salir del modo de creación
               setCreateMode(false);
               setCenterCoordinate(null);
             },
@@ -180,7 +174,7 @@ const MapComponent = () => {
         ]
       );
     } catch (error) {
-      throw error; // El modal mostrará el error
+      throw error;
     }
   };
 
@@ -202,25 +196,15 @@ const MapComponent = () => {
         region={region}
         onRegionChangeComplete={setRegion}
         showsUserLocation={true}
-        showsMyLocationButton={!createMode} // Ocultar en modo creación
-        followsUserLocation={!createMode} // Desactivar seguimiento en modo creación
+        showsMyLocationButton={!createMode}
+        followsUserLocation={!createMode}
       >
-        {/* Marcador de ubicación del usuario */}
-        {!createMode && userLocation && (
-          <Marker
-            coordinate={userLocation}
-            title="Mi ubicación"
-            description="Estás aquí"
-            pinColor="#3b82f6"
-          />
-        )}
-
         {/* Marcadores de puntos de interés */}
         {!createMode && interestPoints.map((point) => (
           <CustomMarker
             key={point.id}
             point={point}
-            onPress={() => handleMarkerPress(point)}
+            onCalloutPress={handleCalloutPress}
           />
         ))}
       </MapView>
@@ -241,7 +225,6 @@ const MapComponent = () => {
           <MapPin size={24} color="#fff" />
         </TouchableOpacity>
       )}
-    
 
       {/* Botones de acción en modo creación */}
       {createMode && (
@@ -272,14 +255,22 @@ const MapComponent = () => {
         </View>
       )}
 
-      {/* Modal de formulario */}
+      {/* Modal de formulario para crear punto */}
       <CreatePointModal
-        visible={showModal}
-        onClose={() => setShowModal(false)}
+        visible={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
         onSubmit={handleSubmitPoint}
         coordinate={centerCoordinate || { latitude: 0, longitude: 0 }}
       />
 
+      {/* Modal de detalles del punto */}
+      <PointDetailModal
+        visible={showDetailModal}
+        point={selectedPoint}
+        onClose={handleCloseDetailModal}
+      />
+
+      <Footer />
     </View>
   );
 };
@@ -315,7 +306,7 @@ const styles = StyleSheet.create({
     top: 16,
     right: 16,
     backgroundColor: '#3b82f6',
-    borderRadius: 50, // Hace el botón circular
+    borderRadius: 50,
     width: 56,
     height: 56,
     alignItems: 'center',
@@ -328,7 +319,7 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     position: 'absolute',
-    bottom: 80, // Encima del Footer
+    bottom: 80,
     left: 16,
     right: 16,
     flexDirection: 'row',
