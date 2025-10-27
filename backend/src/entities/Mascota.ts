@@ -1,19 +1,24 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, Index, JoinColumn } from 'typeorm';
 import { Usuario } from './Usuario';
 import { HistorialMedico } from './HistorialMedico';
 import { Recorrido } from './Recorrido';
 import { Publicacion } from './Publicacion';
 import { RealizadoPor } from './RealizadoPor';
 
-@Index('idx_mascota_usuario', ['usuario'])
 @Entity('mascota')
 export class Mascota {
   @PrimaryGeneratedColumn()
   mascota_id!: number;
+  
+  @Column({ type: 'text', nullable: true })
+  nombre!: string | null;
+
   @Column({ type: 'text', nullable: true })
   descripcion!: string | null;
 
   @ManyToOne(() => Usuario, (u: Usuario) => u.mascotas, { nullable: false, onDelete: 'CASCADE' })
+  @Index('idx_mascota_usuario')
+  @JoinColumn({ name: 'usuario_id' })
   usuario!: Usuario;
 
   @OneToMany(() => HistorialMedico, (h: HistorialMedico) => h.mascota)

@@ -1,10 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, Index, JoinColumn } from 'typeorm';
 import { Usuario } from './Usuario';
 import { Mascota } from './Mascota';
 import { Comentario } from './Comentario';
 
-@Index('idx_pub_usuario', ['usuario'])
-@Index('idx_pub_mascota', ['mascota'])
 @Entity('publicacion')
 export class Publicacion {
   @PrimaryGeneratedColumn()
@@ -24,6 +22,10 @@ export class Publicacion {
 
   @Column({ type: 'int', nullable: true })
   contador_likes!: number | null;
+  @Column({ type: 'int', nullable: true })
+  contador_comentarios!: number | null;
+  @Column({ type: 'int', nullable: true })
+  contador_compartidos!: number | null;
 
   @Column({ type: 'text', nullable: true })
   id_video!: string | null;
@@ -38,9 +40,13 @@ export class Publicacion {
   size_bytes!: string | null;
 
   @ManyToOne(() => Usuario, (u: Usuario) => u.publicaciones, { nullable: false, onDelete: 'CASCADE' })
+  @Index('idx_pub_usuario')
+  @JoinColumn({ name: 'usuario_id' })
   usuario!: Usuario;
 
   @ManyToOne(() => Mascota, (m: Mascota) => m.publicaciones, { nullable: true, onDelete: 'SET NULL' })
+  @Index('idx_pub_mascota')
+  @JoinColumn({ name: 'mascota_id' })
   mascota!: Mascota | null;
 
   @OneToMany(() => Comentario, (c: Comentario) => c.publicacion)

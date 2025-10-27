@@ -5,17 +5,27 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only --ignore-watch node_modules --no-notify src/index.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "seed": "ts-node-dev --transpile-only src/seed.ts",
+    "sync:drive-oauth": "node utils/drive_oauth_sync.js",
+    "sync:drive-service": "node utils/drive_service_account_sync.js",
+    "seeds": "node runSeeds.js"
   },
   "dependencies": {
+    "argon2": "^0.44.0",
     "bcryptjs": "^3.0.2",
+    "cloudinary": "^2.7.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
+    "googleapis": "^161.0.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "minimist": "^1.2.8",
     "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "node-fetch": "^3.3.2",
     "pg": "^8.16.3",
     "pg-hstore": "^2.3.4",
     "reflect-metadata": "^0.2.2",
@@ -24,10 +34,12 @@
     "typescript": "^5.9.3"
   },
   "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.0.0",
     "@types/node": "^24.7.0",
     "nodemon": "^3.1.10",
     "sequelize-cli": "^6.6.3",
     "ts-node-dev": "^2.0.0"
   }
 }
- 

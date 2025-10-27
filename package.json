@@ -4,25 +4,31 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only --ignore-watch node_modules --no-notify backend/src/index.ts",
-    "dev:nodemon": "nodemon --config nodemon.json",
-    "server:legacy": "node backend/server.js",
     "build": "tsc -b backend",
     "start": "node backend/dist/index.js",
     "db:test": "ts-node backend/src/scripts/test-db-connection.ts",
-    "clean": "rimraf backend/dist"
+    "clean": "rimraf backend/dist",
+    "migration:run": "cross-env TS_NODE_PROJECT=backend/tsconfig.json node -r ts-node/register ./node_modules/typeorm/cli.js migration:run -d backend/src/data-source.ts",
+    "migration:revert": "cross-env TS_NODE_PROJECT=backend/tsconfig.json node -r ts-node/register ./node_modules/typeorm/cli.js migration:revert -d backend/src/data-source.ts",
+    "migration:show": "cross-env TS_NODE_PROJECT=backend/tsconfig.json node -r ts-node/register ./node_modules/typeorm/cli.js migration:show -d backend/src/data-source.ts",
+    "migration:generate": "cross-env TS_NODE_PROJECT=backend/tsconfig.json node -r ts-node/register ./node_modules/typeorm/cli.js migration:generate backend/src/migrations/Auto -d backend/src/data-source.ts"
   },
   "dependencies": {
+    "argon2": "^0.44.0",
     "dotenv": "^16.4.5",
+    "jsonwebtoken": "^9.0.2",
     "pg": "^8.11.5",
     "reflect-metadata": "^0.1.13",
     "typeorm": "^0.3.20"
   },
   "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.11.30",
-    "nodemon": "^3.1.0",
+    "cross-env": "^7.0.3",
+    "rimraf": "^5.0.5",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.4.0",
-    "rimraf": "^5.0.5"
+    "typescript": "^5.4.0"
   }
 }
