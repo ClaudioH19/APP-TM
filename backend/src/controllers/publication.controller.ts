@@ -104,6 +104,8 @@ export class PublicationController {
                     let ext = '';
                     if (originalName) {
                         ext = path.extname(originalName);
+                        if (path.extname(originalName).includes('jpeg'))
+                            ext='.jpg'
                     }
                     if (!ext && mime_type) {
                         // Inferir por mime_type básico
@@ -127,37 +129,68 @@ export class PublicationController {
                 }
             }
             
-            // Crear la publicación usando el servicio
-            const newPost = await createPost(
-                parseFloat(ubicacion_lon),
-                parseFloat(ubicacion_lat),
-                descripcion,
-                mascota.usuario, // Pasar el usuario de la mascota
-                mascota,
-                id_video || `post_${Date.now()}`,
-                mime_type || 'image/jpeg',
-                size_bytes
-            );
-            
-            // Iniciar proceso de subida a Cloudinary en background
-            if (localFilePath && id_video) {
-                // Importar y ejecutar la función de subida en background
-                setImmediate(async () => {
-                    try {
-                        const { uploadToCloud } = require('../../utils/upload_to_cloud');
-                        console.log('Starting Cloudinary upload for:', localFilePath);
-                        await uploadToCloud(localFilePath, id_video);
-                        console.log('Cloudinary upload completed for:', id_video);
-                        
-                        // Opcional: eliminar archivo local después de subir a Cloudinary
-                        // fs.unlinkSync(localFilePath);
-                        
-                    } catch (uploadError) {
-                        console.error('Error uploading to Cloudinary:', uploadError);
-                        // El archivo queda guardado localmente como respaldo
-                    }
-                });
+            // Normalizar MIME type y extensión para imágenes JPEG
+            let normalizedMimeType = mime_type;
+            let ext = path.extname(localFilePath); // Asegurar inicialización de ext
+
+            if (mime_type && mime_type === 'image/jpeg') {
+                normalizedMimeType = 'image/jpg'; // Normalizar MIME type
+                if (ext === '.jpeg') {
+                    ext = '.jpg'; // Normalizar extensión
+                }
+                // Asegurar que el archivo local se guarde con '.jpg'
+                localFilePath = localFilePath.replace(/\.jpeg$/, '.jpg');
             }
+
+            // Asegurar que el archivo local también use la extensión normalizada
+            if (ext === '.jpg' || ext === '.jpeg') {
+                ext = '.jpg';
+                localFilePath = localFilePath.replace(/\.jpeg$/, '.jpg'); // Renombrar archivo local si es necesario
+            }
+            
+            // Subir a Cloudinary antes de crear el post
+            if (localFilePath && id_video) {
+                try {
+                    const { uploadToCloud } = require('../../utils/upload_to_cloud');
+                    console.log('Starting Cloudinary upload for:', localFilePath);
+                    await uploadToCloud(localFilePath, id_video);
+                    console.log('Cloudinary upload completed for:', id_video);
+                } catch (uploadError) {
+                    console.error('Error uploading to Cloudinary:', uploadError);
+                    // Eliminar archivo local si la subida falla
+                    if (fs.existsSync(localFilePath)) {
+                        fs.unlinkSync(localFilePath);
+                    }
+                    const errorMessage = uploadError instanceof Error ? uploadError.message : 'Unknown error';
+                    return res.status(500).json({ message: 'Error uploading to Cloudinary', error: errorMessage });
+                }
+            }
+            
+            // Crear la publicación usando el servicio
+            let newPost;
+            try {
+                newPost = await createPost(
+                    parseFloat(ubicacion_lon),
+                    parseFloat(ubicacion_lat),
+                    descripcion,
+                    mascota.usuario, // Pasar el usuario de la mascota
+                    mascota,
+                    id_video || `post_${Date.now()}`,
+                    normalizedMimeType || 'image/jpeg',
+                    size_bytes
+                );
+            } catch (dbError) {
+                console.error('Error creating post in database:', dbError);
+                // Eliminar archivo local si la creación en la base de datos falla
+                if (fs.existsSync(localFilePath)) {
+                    fs.unlinkSync(localFilePath);
+                }
+                const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
+                return res.status(500).json({ message: 'Error creating post in database', error: errorMessage });
+            }
+            
+            // Opcional: eliminar archivo local después de subir a Cloudinary
+            // fs.unlinkSync(localFilePath);
             
             res.status(201).json({ 
                 message: "Publicación creada exitosamente",

@@ -1,6 +1,6 @@
 // permite simplificar las llamadas a la API y una ip global para todo el frontend
 
-export const API_URL = 'http://192.168.1.7:3000';
+export const API_URL = 'http://192.168.120.202:3000';
 
 export const API_ENDPOINTS = {
   LOGIN: `${API_URL}/api/auth/login`,
