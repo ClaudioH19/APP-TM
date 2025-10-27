@@ -11,6 +11,13 @@ const categoryIcons = {
   'Otro': require('../assets/otro.png'),
 };
 
+/**
+ * Obtiene el icono según la categoría
+ */
+const getCategoryIcon = (category) => {
+  return categoryIcons[category] || categoryIcons['Otro'];
+};
+
 const getCategoryColor = (category) => {
   const colors = {
     'Veterinario': '#ef4444',      // rojo
@@ -27,44 +34,34 @@ const getCategoryColor = (category) => {
  * Componente de marcador personalizado
  */
 const CustomMarker = ({ point, onCalloutPress }) => {
-  const pinColor = getCategoryColor(point.category);
-  const iconSource = categoryIcons[point.category];
+  const iconSource = getCategoryIcon(point.category);
+  const hasRating = point.reviewCount > 0;
+  const rating = hasRating ? parseFloat(point.rating).toFixed(1) : 'N/A';
+  
+  // Preparar title y description para el callout nativo
+  const markerTitle = point.title;
+  const markerDescription = `⭐ ${rating} ${hasRating ? `(${point.reviewCount} reseñas)` : ''}`;
 
   return (
     <Marker
       coordinate={point.coordinate}
-      onPress={onPress}
+      onCalloutPress={() => onCalloutPress && onCalloutPress(point)}
       image={iconSource}
-      tracksViewChanges={false}
-    >
-      {/* Callout personalizado */}
-      <Callout
-        onPress={() => onCalloutPress && onCalloutPress(point)}
-        style={styles.callout}
-      >
-        <View style={styles.calloutContainer}>
-          {/* Nombre del punto */}
-          <Text style={styles.calloutTitle} numberOfLines={2}>
-            {point.title}
-          </Text>
-          
-          {/* Calificación */}
-          <View style={styles.ratingRow}>
-            <Text style={styles.starIcon}>⭐</Text>
-            <Text style={styles.ratingText}>
-              {rating} {hasRating && `(${point.reviewCount})`}
-            </Text>
-          </View>
-          
-          {/* Indicador de "tocar para más" */}
-          <Text style={styles.tapHint}>Toca para ver detalles</Text>
-        </View>
-      </Callout>
-    </Marker>
+      title={markerTitle}
+      description={markerDescription}
+    />
   );
 };
 
 const styles = StyleSheet.create({
+  markerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerIcon: {
+    width: 40,
+    height: 40,
+  },
   callout: {
     width: 200,
   },
@@ -72,7 +69,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 12,
-    width: 200,
+    minWidth: 180,
+    maxWidth: 200,
   },
   calloutTitle: {
     fontSize: 15,

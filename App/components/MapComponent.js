@@ -3,7 +3,6 @@ import { View, StyleSheet, Alert, ActivityIndicator, Text, TouchableOpacity } fr
 import MapView, { PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { MapPin, X, Check } from 'lucide-react-native';
-import Footer from './Footer';
 import CustomMarker from './CustomMarker';
 import CreatePointModal from './CreatePointModal';
 import PointDetailModal from './PointDetailModal';
@@ -263,8 +262,6 @@ const MapComponent = () => {
         point={selectedPoint}
         onClose={handleCloseDetailModal}
       />
-
-      <Footer />
     </View>
   );
 };
