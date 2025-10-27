@@ -20,6 +20,7 @@ const MapComponent = () => {
   const [centerCoordinate, setCenterCoordinate] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   
+  
   // Estados para el modal de detalles
   const [selectedPoint, setSelectedPoint] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -136,7 +137,7 @@ const MapComponent = () => {
       '¿Deseas crear un punto de interés en esta ubicación?',
       [
         { text: 'No', style: 'cancel' },
-        { text: 'Sí', onPress: () => setShowModal(true) },
+        { text: 'Sí', onPress: () => setShowCreateModal(true) },
       ]
     );
   };
