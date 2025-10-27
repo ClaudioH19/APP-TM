@@ -11,6 +11,13 @@ const categoryIcons = {
   'Otro': require('../assets/otro.png'),
 };
 
+/**
+ * Obtiene el icono según la categoría
+ */
+const getCategoryIcon = (category) => {
+  return categoryIcons[category] || categoryIcons['Otro'];
+};
+
 const getCategoryColor = (category) => {
   const colors = {
     'Veterinario': '#ef4444',      // rojo
@@ -26,94 +33,70 @@ const getCategoryColor = (category) => {
 /**
  * Componente de marcador personalizado
  */
-const CustomMarker = ({ point, onPress }) => {
-  const pinColor = getCategoryColor(point.category);
-  const iconSource = categoryIcons[point.category];
+const CustomMarker = ({ point, onCalloutPress }) => {
+  const iconSource = getCategoryIcon(point.category);
+  const hasRating = point.reviewCount > 0;
+  const rating = hasRating ? parseFloat(point.rating).toFixed(1) : 'N/A';
+  
+  // Preparar title y description para el callout nativo
+  const markerTitle = point.title;
+  const markerDescription = `⭐ ${rating} ${hasRating ? `(${point.reviewCount} reseñas)` : ''}`;
 
   return (
     <Marker
       coordinate={point.coordinate}
-      onPress={onPress}
+      onCalloutPress={() => onCalloutPress && onCalloutPress(point)}
       image={iconSource}
-      tracksViewChanges={false}
-    >
-      <Callout tooltip>
-        <View style={styles.calloutContainer}>
-          {/* Título */}
-          <Text style={styles.calloutTitle}>{point.title}</Text>
-          
-          {/* Categoría */}
-          <View style={[styles.categoryBadge, { backgroundColor: pinColor }]}>
-            <Text style={styles.categoryText}>{point.category}</Text>
-          </View>
-          
-          {/* Calificación */}
-          <Text style={styles.calloutRating}>
-            ⭐ {point.rating} ({point.reviewCount} reseñas)
-          </Text>
-          
-          {/* Descripción */}
-          {point.description && (
-            <Text style={styles.calloutDescription} numberOfLines={3}>
-              {point.description}
-            </Text>
-          )}
-          
-          {/* Creador */}
-          <Text style={styles.calloutCreator}>
-            Creado por: {point.createdBy} (@{point.username})
-          </Text>
-        </View>
-      </Callout>
-    </Marker>
+      title={markerTitle}
+      description={markerDescription}
+    />
   );
 };
 
 const styles = StyleSheet.create({
+  markerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerIcon: {
+    width: 40,
+    height: 40,
+  },
+  callout: {
+    width: 200,
+  },
   calloutContainer: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 12,
-    width: 250,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    minWidth: 180,
+    maxWidth: 200,
   },
   calloutTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
-    marginBottom: 8,
     color: '#1f2937',
+    marginBottom: 6,
   },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginBottom: 8,
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
   },
-  categoryText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  calloutRating: {
+  starIcon: {
     fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 8,
+    marginRight: 4,
   },
-  calloutDescription: {
+  ratingText: {
     fontSize: 13,
-    color: '#4b5563',
-    marginBottom: 8,
-    lineHeight: 18,
+    color: '#6b7280',
+    fontWeight: '500',
   },
-  calloutCreator: {
+  tapHint: {
     fontSize: 11,
-    color: '#9ca3af',
+    color: '#3b82f6',
     fontStyle: 'italic',
+    marginTop: 4,
   },
 });
 

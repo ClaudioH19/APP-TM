@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Alert, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { MapPin, X, Check } from 'lucide-react-native';
 import CustomMarker from './CustomMarker';
 import CreatePointModal from './CreatePointModal';
+import PointDetailModal from './PointDetailModal';
 import { getInterestPoints, formatPointsForMap, createInterestPoint } from '../services/interestPointsService';
 
 const MapComponent = () => {
@@ -17,7 +18,11 @@ const MapComponent = () => {
   
   const [createMode, setCreateMode] = useState(false);
   const [centerCoordinate, setCenterCoordinate] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  
+  // Estados para el modal de detalles
+  const [selectedPoint, setSelectedPoint] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   useEffect(() => {
     getUserLocation();
@@ -95,8 +100,21 @@ const MapComponent = () => {
     }
   };
 
-  const handleMarkerPress = (point) => {
-    console.log('Marcador presionado:', point.title);
+  /**
+   * Maneja cuando se presiona el callout de un marcador
+   */
+  const handleCalloutPress = (point) => {
+    console.log('Abriendo detalles de:', point.title);
+    setSelectedPoint(point);
+    setShowDetailModal(true);
+  };
+
+  /**
+   * Cierra el modal de detalles
+   */
+  const handleCloseDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedPoint(null);
   };
 
   const handleActivateCreateMode = () => {
@@ -174,12 +192,12 @@ const MapComponent = () => {
         rotateEnabled={true}
         pitchEnabled={true}
       >
-        {/* marcadores de puntos de interés */}
+        {/* Marcadores de puntos de interés */}
         {!createMode && interestPoints.map((point) => (
           <CustomMarker
             key={point.id}
             point={point}
-            onPress={() => handleMarkerPress(point)}
+            onCalloutPress={handleCalloutPress}
           />
         ))}
       </MapView>
@@ -230,12 +248,19 @@ const MapComponent = () => {
         </View>
       )}
 
-      {/* modal de formulario para crear punto de interés */}
+      {/* Modal de formulario para crear punto */}
       <CreatePointModal
-        visible={showModal}
-        onClose={() => setShowModal(false)}
+        visible={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
         onSubmit={handleSubmitPoint}
         coordinate={centerCoordinate || { latitude: 0, longitude: 0 }}
+      />
+
+      {/* Modal de detalles del punto */}
+      <PointDetailModal
+        visible={showDetailModal}
+        point={selectedPoint}
+        onClose={handleCloseDetailModal}
       />
     </View>
   );
