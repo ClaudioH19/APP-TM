@@ -7,6 +7,8 @@ import CustomMarker from './CustomMarker';
 import CreatePointModal from './CreatePointModal';
 import PointDetailModal from './PointDetailModal';
 import { getInterestPoints, formatPointsForMap, createInterestPoint } from '../services/interestPointsService';
+import { useIsFocused } from '@react-navigation/native';
+
 
 const mapStyle = [
   {
@@ -36,7 +38,7 @@ const MapComponent = () => {
   const [createMode, setCreateMode] = useState(false);
   const [centerCoordinate, setCenterCoordinate] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  
+  const isFocused = useIsFocused();
   
   // Estados para el modal de detalles
   const [selectedPoint, setSelectedPoint] = useState(null);
@@ -162,7 +164,7 @@ const MapComponent = () => {
   const handleSubmitPoint = async (pointData) => {
     try {
       await createInterestPoint(pointData);
-      
+      setShowCreateModal(false);
       Alert.alert(
         '¡Éxito!',
         'El punto de interés ha sido creado correctamente',
@@ -170,15 +172,16 @@ const MapComponent = () => {
           {
             text: 'OK',
             onPress: () => {
-              loadInterestPoints();
               setCreateMode(false);
               setCenterCoordinate(null);
+              loadInterestPoints();
             },
           },
         ]
       );
     } catch (error) {
       console.error('Error al crear punto:', error);
+      setShowCreateModal(false);
       Alert.alert('Error', error.message || 'No se pudo crear el punto de interés');
     }
   };
@@ -201,6 +204,9 @@ const MapComponent = () => {
         customMapStyle={mapStyle}
         initialRegion={region}
         showsPointsOfInterest={false}
+        showsUserLocation={isFocused}  
+        showsCompass={false}     
+        rotateEnabled={false}    
         onRegionChangeComplete={(newRegion) => {
         
           // solo actualizar región en modo creación para capturar coordenada del centro
@@ -208,10 +214,8 @@ const MapComponent = () => {
             setRegion(newRegion);
           }
         }}
-        showsUserLocation={true}
         showsMyLocationButton={!createMode} // ocultar botón GPS en modo creación
         followsUserLocation={false}
-        rotateEnabled={true}
         pitchEnabled={true}
       >
         {/* Marcadores de puntos de interés */}
