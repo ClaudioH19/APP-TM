@@ -1,12 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Alert, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
-import MapView, { PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { MapPin, X, Check } from 'lucide-react-native';
 import CustomMarker from './CustomMarker';
 import CreatePointModal from './CreatePointModal';
 import PointDetailModal from './PointDetailModal';
 import { getInterestPoints, formatPointsForMap, createInterestPoint } from '../services/interestPointsService';
+
+const mapStyle = [
+  {
+    "featureType": "poi",
+    "elementType": "labels",
+    "stylers": [
+      { "visibility": "off" }
+    ]
+  },
+  {
+    "featureType": "poi.business",
+    "elementType": "labels",
+    "stylers": [
+      { "visibility": "off" }
+    ]
+  }
+];
 
 const MapComponent = () => {
   const mapRef = useRef(null);
@@ -19,6 +36,7 @@ const MapComponent = () => {
   const [createMode, setCreateMode] = useState(false);
   const [centerCoordinate, setCenterCoordinate] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  
   
   // Estados para el modal de detalles
   const [selectedPoint, setSelectedPoint] = useState(null);
@@ -136,7 +154,7 @@ const MapComponent = () => {
       '¿Deseas crear un punto de interés en esta ubicación?',
       [
         { text: 'No', style: 'cancel' },
-        { text: 'Sí', onPress: () => setShowModal(true) },
+        { text: 'Sí', onPress: () => setShowCreateModal(true) },
       ]
     );
   };
@@ -160,7 +178,8 @@ const MapComponent = () => {
         ]
       );
     } catch (error) {
-      throw error;
+      console.error('Error al crear punto:', error);
+      Alert.alert('Error', error.message || 'No se pudo crear el punto de interés');
     }
   };
 
@@ -178,9 +197,12 @@ const MapComponent = () => {
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={PROVIDER_DEFAULT}
+        provider={PROVIDER_GOOGLE}
+        customMapStyle={mapStyle}
         initialRegion={region}
+        showsPointsOfInterest={false}
         onRegionChangeComplete={(newRegion) => {
+        
           // solo actualizar región en modo creación para capturar coordenada del centro
           if (createMode) {
             setRegion(newRegion);
@@ -339,7 +361,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   confirmButton: {
-    backgroundColor: '#10b981',
+    backgroundColor: '#3b82f6',
   },
   confirmButtonText: {
     color: 'white',
