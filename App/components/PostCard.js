@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, Image, Pressable, ActivityIndicator } from 'react-native';
 import { Volume2, VolumeX } from 'lucide-react-native';
 import { Heart, MessageCircle, Share2 } from 'lucide-react-native';
+import CommentsModal from './CommentsModal';
 import { API_ENDPOINTS } from '../config/api';
 import { Video } from 'expo-av';
 import { Svg, Circle, Text as SvgText } from 'react-native-svg';
@@ -39,6 +40,9 @@ export const PostCard = ({ post }) => {
     setLiked(prev => !prev);
     setLikeCount(c => (liked ? c - 1 : c + 1));
   };
+  const [commentsVisible, setCommentsVisible] = useState(false);
+  const openComments = () => setCommentsVisible(true);
+  const closeComments = () => setCommentsVisible(false);
 
   return (
     <View className="bg-white">
@@ -182,7 +186,7 @@ export const PostCard = ({ post }) => {
           <Text className="text-sm text-gray-700">{likeCount}</Text>
         </Pressable>
 
-        <Pressable className="flex-row items-center gap-1.5">
+        <Pressable className="flex-row items-center gap-1.5" onPress={openComments}>
           <MessageCircle size={20} color="#374151" />
           <Text className="text-sm text-gray-700">{commentCount}</Text>
         </Pressable>
@@ -192,6 +196,7 @@ export const PostCard = ({ post }) => {
           <Text className="text-sm text-gray-700">{shareCount}</Text>
         </Pressable>
       </View>
+      <CommentsModal postId={post.id} visible={commentsVisible} onClose={closeComments} />
     </View>
   );
 };
