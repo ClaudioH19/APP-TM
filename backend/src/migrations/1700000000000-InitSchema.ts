@@ -13,7 +13,13 @@ export class InitSchema1700000000000 implements MigrationInterface {
         ubicacion   TEXT NOT NULL
       );
     `);
-
+    await queryRunner.query(`CREATE TABLE interaccion (
+    id             SERIAL PRIMARY KEY,
+    interaccion_tipo INT,
+    publicacion_id INT NOT NULL REFERENCES publicacion(id),
+    usuario_id     INT NOT NULL REFERENCES usuario(usuario_id),
+    fecha          TIMESTAMP
+    );`);
     await queryRunner.query(`
       CREATE TABLE mascota (
         mascota_id  SERIAL PRIMARY KEY,

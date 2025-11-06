@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { Publicacion} from '../entities/Publicacion';
 import { Mascota } from '../entities/Mascota';
-import { createPost } from '../services/post_service';
+import { crear_interaccion, createPost, eliminar_interaccion } from '../services/post_service';
 import { getUserFromToken } from '../services/token_service';
 import { AppDataSource } from '../data-source';
 import * as fs from 'fs';
@@ -185,5 +185,56 @@ export class PublicationController {
             res.status(500).json({ message: 'Error deleting publication' });
         }
     }
-
+    static async agregar_interaccion(req: Request, res: Response) {
+        const id = parseInt(req.params.id);
+        try {
+            console.log('Agregando interacción para post:', id);
+            console.log('Body recibido:', req.body);
+            
+            // Obtener el token del header Authorization
+            const token = req.headers.authorization?.split(' ')[1];
+            if (!token) {
+                console.log('Token no proporcionado');
+                return res.status(401).json({ message: "Token no proporcionado" });
+            }
+            
+            // Obtener el usuario del token
+            const userFromToken = await getUserFromToken(token);
+            if (!userFromToken) {
+                console.log('Token inválido');
+                return res.status(401).json({ message: "Token inválido" });
+            }
+            
+            console.log('Usuario del token:', userFromToken);
+            const { interaccion_tipo } = req.body;
+            console.log('Tipo de interacción:', interaccion_tipo);
+            
+            await crear_interaccion(userFromToken, id, interaccion_tipo);
+            console.log('Interacción creada exitosamente');
+            res.status(200).json({ message: 'Interacción agregada exitosamente' });
+        } catch (error) {
+            console.error('Error en agregar_interaccion:', error);
+            res.status(500).json({ message: 'Error agregando interacción', error: String(error) });
+        }   
+    }
+    static async eliminar_interaccion(req: Request, res: Response) {
+        const id = parseInt(req.params.id);
+        try {
+            // Obtener el token del header Authorization
+            const token = req.headers.authorization?.split(' ')[1]; 
+            if (!token) {
+                return res.status(401).json({ message: "Token no proporcionado" });
+            }
+            // Obtener el usuario del token
+            const userFromToken = await getUserFromToken(token);
+            if (!userFromToken) {
+                return res.status(401).json({ message: "Token inválido" });
+            }
+            const interaccion_tipo = req.body.interaccion_tipo;
+            await eliminar_interaccion(userFromToken, id, interaccion_tipo);
+            res.status(200).json({ message: 'Interacción eliminada exitosamente' });
+        } catch (error) {
+            res.status(500).json({ message: 'Error eliminando interacción' });
+        }
+    }
 }

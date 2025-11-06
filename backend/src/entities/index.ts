@@ -8,3 +8,4 @@ export * from './Comentario';
 export * from './PuntoDeInteres';
 export * from './Resena';
 export * from './RealizadoPor';
+export * from './Interaccion';

@@ -11,6 +11,7 @@ import { Comentario } from './entities/Comentario';
 import { PuntoDeInteres } from './entities/PuntoDeInteres';
 import { Resena } from './entities/Resena';
 import { RealizadoPor } from './entities/RealizadoPor';
+import { Interaccion } from './entities/Interaccion';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -25,7 +26,8 @@ export const AppDataSource = new DataSource({
     Comentario,
     PuntoDeInteres,
     Resena,
-    RealizadoPor
+    RealizadoPor,
+    Interaccion
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: env.DB_SYNCHRONIZE,

@@ -5,6 +5,7 @@ import { Heart, MessageCircle, Share2 } from 'lucide-react-native';
 import { API_ENDPOINTS } from '../config/api';
 import { Video } from 'expo-av';
 import { Svg, Circle, Text as SvgText } from 'react-native-svg';
+import { sendInteraccion } from '../services/interaccion_service';
 
 const Dot = ({ color = 'bg-gray-600' }) => (
   <View className={`w-1 h-1 ${color} rounded-full`} />
@@ -27,17 +28,79 @@ const DefaultAvatar = () => (
 );
 
 export const PostCard = ({ post }) => {
+  // Si el backend retorna si el usuario ya dio like, úsalo aquí. Por ahora, asumimos que no.
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.contador_likes ?? 0);
   const [commentCount, setCommentCount] = useState(post.contador_comentarios ?? 0);
   const [shareCount, setShareCount] = useState(post.contador_compartidos ?? 0);
   const videoRef = useRef(null);
   const [muted, setMuted] = useState(true);
+  const [loadingLike, setLoadingLike] = useState(false);
+  const [loadingComment, setLoadingComment] = useState(false);
+  const [loadingShare, setLoadingShare] = useState(false);
   const toggleMute = () => setMuted(m => !m);
 
-  const toggleLike = () => {
-    setLiked(prev => !prev);
-    setLikeCount(c => (liked ? c - 1 : c + 1));
+  // Like toggle seguro
+  const handleLike = async () => {
+    if (loadingLike) return;
+    console.log('Enviando like para post:', post.id);
+    setLoadingLike(true);
+    
+    // Actualizar el UI optimistamente
+    const newLiked = !liked;
+    setLiked(newLiked);
+    setLikeCount(c => newLiked ? c + 1 : c - 1);
+    
+    try {
+      const result = await sendInteraccion(post.id, 1);
+      console.log('Respuesta del servidor:', result);
+    } catch (e) {
+      console.error('Error al dar like:', e);
+      // Revertir cambios si hay error
+      setLiked(!newLiked);
+      setLikeCount(c => newLiked ? c - 1 : c + 1);
+    } finally {
+      setLoadingLike(false);
+    }
+  };
+
+  // Comentario y compartir solo suman
+  const handleComment = async () => {
+    if (loadingComment) return;
+    console.log('Enviando comentario para post:', post.id);
+    setLoadingComment(true);
+    
+    // Actualizar optimistamente
+    setCommentCount(c => c + 1);
+    
+    try {
+      const result = await sendInteraccion(post.id, 2);
+      console.log('Respuesta comentario:', result);
+    } catch (e) {
+      console.error('Error al comentar:', e);
+      // Revertir si hay error
+      setCommentCount(c => c - 1);
+    }
+    finally { setLoadingComment(false); }
+  };
+  
+  const handleShare = async () => {
+    if (loadingShare) return;
+    console.log('Enviando compartir para post:', post.id);
+    setLoadingShare(true);
+    
+    // Actualizar optimistamente
+    setShareCount(c => c + 1);
+    
+    try {
+      const result = await sendInteraccion(post.id, 3);
+      console.log('Respuesta compartir:', result);
+    } catch (e) {
+      console.error('Error al compartir:', e);
+      // Revertir si hay error
+      setShareCount(c => c - 1);
+    }
+    finally { setLoadingShare(false); }
   };
 
   return (
@@ -173,23 +236,23 @@ export const PostCard = ({ post }) => {
 
       {/* Actions */}
       <View className="flex-row items-center justify-between px-4 py-3">
-        <Pressable onPress={toggleLike} className="flex-row items-center gap-1.5">
+        <Pressable onPress={handleLike} className="flex-row items-center gap-1.5" disabled={loadingLike}>
           <Heart
             size={20}
             color={liked ? '#ef4444' : '#374151'}
             fill={liked ? '#ef4444' : 'transparent'}
           />
-          <Text className="text-sm text-gray-700">{likeCount}</Text>
+          {loadingLike ? <ActivityIndicator size="small" color="#ef4444" /> : <Text className="text-sm text-gray-700">{likeCount}</Text>}
         </Pressable>
 
-        <Pressable className="flex-row items-center gap-1.5">
+        <Pressable onPress={handleComment} className="flex-row items-center gap-1.5" disabled={loadingComment}>
           <MessageCircle size={20} color="#374151" />
-          <Text className="text-sm text-gray-700">{commentCount}</Text>
+          {loadingComment ? <ActivityIndicator size="small" color="#374151" /> : <Text className="text-sm text-gray-700">{commentCount}</Text>}
         </Pressable>
 
-        <Pressable className="flex-row items-center gap-1.5">
+        <Pressable onPress={handleShare} className="flex-row items-center gap-1.5" disabled={loadingShare}>
           <Share2 size={20} color="#374151" />
-          <Text className="text-sm text-gray-700">{shareCount}</Text>
+          {loadingShare ? <ActivityIndicator size="small" color="#374151" /> : <Text className="text-sm text-gray-700">{shareCount}</Text>}
         </Pressable>
       </View>
     </View>
