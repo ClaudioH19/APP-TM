@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Publicacion} from '../entities/Publicacion';
 import { Mascota } from '../entities/Mascota';
+import { Interaccion } from '../entities/Interaccion';
 import { crear_interaccion, createPost, eliminar_interaccion } from '../services/post_service';
 import { getUserFromToken } from '../services/token_service';
 import { AppDataSource } from '../data-source';
@@ -16,14 +17,51 @@ export class PublicationController {
     static async getPublications(req: Request, res: Response) {
         try {
             console.log('Fetching all publications from the database...'); // Debug log
-            //obtener todas las publicaciones ordenadas por fecha
-            const publicationRepo = req.app.get('dataSource').getRepository(Publicacion);
+            const dataSource = req.app.get('dataSource');
+            const publicationRepo = dataSource.getRepository(Publicacion);
+            const interaccionRepo = dataSource.getRepository(Interaccion);
+            
+            // Obtener todas las publicaciones ordenadas por fecha
             const publications = await publicationRepo.find({
                 order: { fecha: 'DESC' },
                 relations: ['usuario', 'mascota'],
             });
-            console.log('Publications fetched successfully:', publications);
-            res.json(publications);
+
+            // Para cada publicación, calcular los contadores de interacciones
+            const publicationsWithCounts = await Promise.all(
+                publications.map(async (publication: Publicacion) => {
+                    const [likeCount, commentCount, shareCount] = await Promise.all([
+                        interaccionRepo.count({
+                            where: { 
+                                publicacion: { id: publication.id }, 
+                                interaccion_tipo: 1 
+                            }
+                        }),
+                        interaccionRepo.count({
+                            where: { 
+                                publicacion: { id: publication.id }, 
+                                interaccion_tipo: 2 
+                            }
+                        }),
+                        interaccionRepo.count({
+                            where: { 
+                                publicacion: { id: publication.id }, 
+                                interaccion_tipo: 3 
+                            }
+                        })
+                    ]);
+
+                    return {
+                        ...publication,
+                        contador_likes: likeCount,
+                        contador_comentarios: commentCount,
+                        contador_compartidos: shareCount
+                    };
+                })
+            );
+
+            console.log('Publications fetched with interaction counts:', publicationsWithCounts.length);
+            res.json(publicationsWithCounts);
         } catch (error) {
             console.error('Error fetching publications:', error);
             res.status(500).json({ message: 'Error fetching publications' });
@@ -32,15 +70,49 @@ export class PublicationController {
     static async getPublicationById(req: Request, res: Response) {
         const id = parseInt(req.params.id);
         try {
-            const publicationRepo = req.app.get('dataSource').getRepository(Publicacion);
+            const dataSource = req.app.get('dataSource');
+            const publicationRepo = dataSource.getRepository(Publicacion);
+            const interaccionRepo = dataSource.getRepository(Interaccion);
+            
             const publication = await publicationRepo.findOne({
                 where: { id },
                 relations: ['usuario', 'mascota'],
             });
+            
             if (!publication) {
                 return res.status(404).json({ message: 'Publication not found' });
             }
-            res.json(publication);
+
+            // Calcular contadores de interacciones
+            const [likeCount, commentCount, shareCount] = await Promise.all([
+                interaccionRepo.count({
+                    where: { 
+                        publicacion: { id: publication.id }, 
+                        interaccion_tipo: 1 
+                    }
+                }),
+                interaccionRepo.count({
+                    where: { 
+                        publicacion: { id: publication.id }, 
+                        interaccion_tipo: 2 
+                    }
+                }),
+                interaccionRepo.count({
+                    where: { 
+                        publicacion: { id: publication.id }, 
+                        interaccion_tipo: 3 
+                    }
+                })
+            ]);
+
+            const publicationWithCounts = {
+                ...publication,
+                contador_likes: likeCount,
+                contador_comentarios: commentCount,
+                contador_compartidos: shareCount
+            };
+
+            res.json(publicationWithCounts);
         } catch (error) {
             res.status(500).json({ message: 'Error fetching publication' });
         }
@@ -211,10 +283,48 @@ export class PublicationController {
             
             await crear_interaccion(userFromToken, id, interaccion_tipo);
             console.log('Interacción creada exitosamente');
-            res.status(200).json({ message: 'Interacción agregada exitosamente' });
+            
+            // Calcular y devolver los contadores actualizados
+            const dataSource = req.app.get('dataSource');
+            const interaccionRepo = dataSource.getRepository(Interaccion);
+            
+            const [likeCount, commentCount, shareCount] = await Promise.all([
+                interaccionRepo.count({
+                    where: { 
+                        publicacion: { id: id }, 
+                        interaccion_tipo: 1 
+                    }
+                }),
+                interaccionRepo.count({
+                    where: { 
+                        publicacion: { id: id }, 
+                        interaccion_tipo: 2 
+                    }
+                }),
+                interaccionRepo.count({
+                    where: { 
+                        publicacion: { id: id }, 
+                        interaccion_tipo: 3 
+                    }
+                })
+            ]);
+            
+            res.status(200).json({ 
+                message: 'Interacción agregada exitosamente',
+                success: true,
+                counters: {
+                    likes: likeCount,
+                    comments: commentCount,
+                    shares: shareCount
+                }
+            });
         } catch (error) {
             console.error('Error en agregar_interaccion:', error);
-            res.status(500).json({ message: 'Error agregando interacción', error: String(error) });
+            res.status(500).json({ 
+                message: 'Error agregando interacción', 
+                success: false,
+                error: String(error) 
+            });
         }   
     }
     static async eliminar_interaccion(req: Request, res: Response) {
@@ -232,9 +342,92 @@ export class PublicationController {
             }
             const interaccion_tipo = req.body.interaccion_tipo;
             await eliminar_interaccion(userFromToken, id, interaccion_tipo);
-            res.status(200).json({ message: 'Interacción eliminada exitosamente' });
+            
+            // Calcular y devolver los contadores actualizados
+            const dataSource = req.app.get('dataSource');
+            const interaccionRepo = dataSource.getRepository(Interaccion);
+            
+            const [likeCount, commentCount, shareCount] = await Promise.all([
+                interaccionRepo.count({
+                    where: { 
+                        publicacion: { id: id }, 
+                        interaccion_tipo: 1 
+                    }
+                }),
+                interaccionRepo.count({
+                    where: { 
+                        publicacion: { id: id }, 
+                        interaccion_tipo: 2 
+                    }
+                }),
+                interaccionRepo.count({
+                    where: { 
+                        publicacion: { id: id }, 
+                        interaccion_tipo: 3 
+                    }
+                })
+            ]);
+            
+            res.status(200).json({ 
+                message: 'Interacción eliminada exitosamente',
+                success: true,
+                counters: {
+                    likes: likeCount,
+                    comments: commentCount,
+                    shares: shareCount
+                }
+            });
         } catch (error) {
-            res.status(500).json({ message: 'Error eliminando interacción' });
+            res.status(500).json({ 
+                message: 'Error eliminando interacción',
+                success: false,
+                error: String(error)
+            });
+        }
+    }
+
+    static async getUserInteractions(req: Request, res: Response) {
+        const postId = parseInt(req.params.id);
+        try {
+            // Obtener el token del header Authorization
+            const token = req.headers.authorization?.split(' ')[1];
+            if (!token) {
+                return res.status(401).json({ message: "Token no proporcionado" });
+            }
+            
+            // Obtener el usuario del token
+            const userFromToken = await getUserFromToken(token);
+            if (!userFromToken) {
+                return res.status(401).json({ message: "Token inválido" });
+            }
+            
+            console.log(`Obteniendo interacciones del usuario ${userFromToken.usuario_id} para post ${postId}`);
+            
+            // Obtener todas las interacciones del usuario para este post
+            const interaccionRepo = req.app.get('dataSource').getRepository(Interaccion);
+            const userInteractions = await interaccionRepo.find({
+                where: {
+                    publicacion: { id: postId },
+                    usuario: { usuario_id: userFromToken.usuario_id }
+                },
+                select: ['interaccion_tipo']
+            });
+            
+            // Crear objeto con los tipos de interacción
+            const interactions = {
+                userId: userFromToken.usuario_id,
+                postId: postId,
+                hasLiked: userInteractions.some((i: Interaccion) => i.interaccion_tipo === 1),
+                hasCommented: userInteractions.some((i: Interaccion) => i.interaccion_tipo === 2),
+                hasShared: userInteractions.some((i: Interaccion) => i.interaccion_tipo === 3)
+            };
+            
+            console.log('Interacciones encontradas:', interactions);
+            res.json(interactions);
+            
+        } catch (error) {
+            console.error('Error obteniendo interacciones del usuario:', error);
+            res.status(500).json({ message: 'Error obteniendo interacciones del usuario' });
         }
     }
 }
