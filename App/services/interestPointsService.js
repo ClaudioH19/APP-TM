@@ -121,3 +121,41 @@ export const formatPointsForMap = (points) => {
     createdAt: point.fecha_creacion,
   }));
 };
+
+/**
+ * Obtiene las reseñas de un punto de interés (paginadas)
+ * @param {number} pointId - ID del punto de interés
+ * @param {number} index - Índice de paginación (default: 0)
+ * @param {number} limit - Límite de resultados (default: 10)
+ * @returns {Promise<Object>} Objeto con items, total, offset y limit
+ */
+export const getReviews = async (pointId, index = 0, limit = 10) => {
+  try {
+    const token = await AsyncStorage.getItem('token');
+    
+    if (!token) {
+      throw new Error('No hay sesión activa. Por favor inicia sesión.');
+    }
+
+    const url = `${API_ENDPOINTS.REVIEWS}/${pointId}?index=${index}&limit=${limit}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Error HTTP: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error obteniendo reseñas:', error);
+    throw error;
+  }
+};

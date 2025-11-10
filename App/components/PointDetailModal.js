@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   View,
@@ -7,7 +7,8 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import { X, MapPin, Calendar, MessageSquare, Star, Tag } from 'lucide-react-native';
+import { X, MapPin, Calendar, MessageSquare, Star, Tag, ChevronRight } from 'lucide-react-native';
+import ReviewsModal from './ReviewsModal';
 
 /**
  * Formatea la fecha de creación
@@ -40,6 +41,8 @@ const getCategoryColor = (category) => {
 };
 
 const PointDetailModal = ({ visible, point, onClose }) => {
+  const [showReviewsModal, setShowReviewsModal] = useState(false);
+  
   if (!point) return null;
 
   const categoryColor = getCategoryColor(point.category);
@@ -98,6 +101,19 @@ const PointDetailModal = ({ visible, point, onClose }) => {
               ) : (
                 <Text style={styles.noRatingText}>Sin calificaciones aún</Text>
               )}
+              
+              {/* Botón para ver todas las reseñas */}
+              {hasRating && (
+                <TouchableOpacity
+                  style={styles.viewReviewsButton}
+                  onPress={() => setShowReviewsModal(true)}
+                >
+                  <Text style={styles.viewReviewsButtonText}>
+                    Ver todas las reseñas
+                  </Text>
+                  <ChevronRight size={20} color="#3b82f6" />
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Fecha de creación */}
@@ -144,6 +160,14 @@ const PointDetailModal = ({ visible, point, onClose }) => {
           </TouchableOpacity>
         </View>
       </View>
+      
+      {/* Modal de reseñas */}
+      <ReviewsModal
+        visible={showReviewsModal}
+        pointId={point.id}
+        pointName={point.title}
+        onClose={() => setShowReviewsModal(false)}
+      />
     </Modal>
   );
 };
@@ -246,6 +270,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#9ca3af',
     fontStyle: 'italic',
+  },
+  viewReviewsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#eff6ff',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  viewReviewsButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#3b82f6',
   },
   description: {
     fontSize: 16,
