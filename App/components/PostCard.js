@@ -1,11 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Image, Pressable, ActivityIndicator } from 'react-native';
 import { Volume2, VolumeX } from 'lucide-react-native';
-import { Heart, MessageCircle, Share2 } from 'lucide-react-native';
+import { Heart, MessageCircle } from 'lucide-react-native';
 import CommentsModal from './CommentsModal';
 import { API_ENDPOINTS } from '../config/api';
 import { Video } from 'expo-av';
 import { Svg, Circle, Text as SvgText } from 'react-native-svg';
+import { sendInteraccion, getUserInteractions } from '../services/interaccion_service';
 
 const Dot = ({ color = 'bg-gray-600' }) => (
   <View className={`w-1 h-1 ${color} rounded-full`} />
@@ -28,21 +29,96 @@ const DefaultAvatar = () => (
 );
 
 export const PostCard = ({ post }) => {
+  // Estados para las interacciones
   const [liked, setLiked] = useState(false);
+  const [commented, setCommented] = useState(false);
+  
+  // Estados para los contadores
   const [likeCount, setLikeCount] = useState(post.contador_likes ?? 0);
   const [commentCount, setCommentCount] = useState(post.contador_comentarios ?? 0);
-  const [shareCount, setShareCount] = useState(post.contador_compartidos ?? 0);
+  
+  // Estados para loading
+  const [loadingLike, setLoadingLike] = useState(false);
+  const [loadingInteractions, setLoadingInteractions] = useState(false);
+  
+  // Estados para video
   const videoRef = useRef(null);
   const [muted, setMuted] = useState(true);
   const toggleMute = () => setMuted(m => !m);
 
-  const toggleLike = () => {
-    setLiked(prev => !prev);
-    setLikeCount(c => (liked ? c - 1 : c + 1));
+  // Función para cargar las interacciones del usuario
+  const loadUserInteractions = async () => {
+    setLoadingInteractions(true);
+    try {
+      const interactions = await getUserInteractions(post.id);
+      setLiked(interactions.hasLiked);
+      setCommented(interactions.hasCommented);
+    } catch (error) {
+      console.error('Error cargando interacciones:', error);
+    } finally {
+      setLoadingInteractions(false);
+    }
   };
   const [commentsVisible, setCommentsVisible] = useState(false);
   const openComments = () => setCommentsVisible(true);
   const closeComments = () => setCommentsVisible(false);
+
+  // Cargar interacciones al montar el componente
+  useEffect(() => {
+    loadUserInteractions();
+    refreshCommentCount(); // Cargar el contador real de comentarios
+  }, [post.id]);
+
+  // Like toggle seguro
+  const handleLike = async () => {
+    if (loadingLike) return;
+    console.log('Enviando like para post:', post.id);
+    setLoadingLike(true);
+    
+    // Actualizar el UI optimistamente
+    const newLiked = !liked;
+    setLiked(newLiked);
+    const previousLikeCount = likeCount;
+    setLikeCount(c => newLiked ? c + 1 : c - 1);
+    
+    try {
+      const result = await sendInteraccion(post.id, 1);
+      console.log('Respuesta del servidor:', result);
+      
+      if (result.success && result.counters) {
+        // Usar los contadores reales del backend
+        setLikeCount(result.counters.likes);
+        setCommentCount(result.counters.comments);
+      } else {
+        // Revertir cambios si hay error
+        setLiked(!newLiked);
+        setLikeCount(previousLikeCount);
+      }
+    } catch (e) {
+      console.error('Error al dar like:', e);
+      // Revertir cambios si hay error
+      setLiked(!newLiked);
+      setLikeCount(previousLikeCount);
+    } finally {
+      setLoadingLike(false);
+    }
+  };
+
+  // Función para actualizar el contador de comentarios desde el backend
+  const refreshCommentCount = async () => {
+    try {
+      const response = await fetch(`${API_ENDPOINTS.COMMENTS}?publicacion_id=${post.id}`);
+      if (response.ok) {
+        const comments = await response.json();
+        setCommentCount(comments.length);
+        setCommented(comments.length > 0);
+      }
+    } catch (error) {
+      console.error('Error al actualizar contador de comentarios:', error);
+    }
+  };
+  
+
 
   return (
     <View className="bg-white">
@@ -64,11 +140,7 @@ export const PostCard = ({ post }) => {
           </View>
         </View>
 
-        <Pressable className="flex-row gap-1">
-          <Dot />
-          <Dot />
-          <Dot />
-        </Pressable>
+
       </View>
 
       {/* Ubicación */}
@@ -176,27 +248,36 @@ export const PostCard = ({ post }) => {
       ) : null}
 
       {/* Actions */}
-      <View className="flex-row items-center justify-between px-4 py-3">
-        <Pressable onPress={toggleLike} className="flex-row items-center gap-1.5">
+      <View className="flex-row items-center justify-between px-12 py-3">
+        {loadingInteractions && (
+          <View className="absolute right-4 top-3">
+            <ActivityIndicator size="small" color="#9ca3af" />
+          </View>
+        )}
+        <Pressable onPress={handleLike} className="flex-row items-center gap-1.5" disabled={loadingLike || loadingInteractions}>
           <Heart
             size={20}
             color={liked ? '#ef4444' : '#374151'}
             fill={liked ? '#ef4444' : 'transparent'}
           />
-          <Text className="text-sm text-gray-700">{likeCount}</Text>
+          {loadingLike ? <ActivityIndicator size="small" color="#ef4444" /> : <Text className="text-sm text-gray-700">{likeCount}</Text>}
         </Pressable>
 
-        <Pressable className="flex-row items-center gap-1.5" onPress={openComments}>
-          <MessageCircle size={20} color="#374151" />
+        <Pressable onPress={openComments} className="flex-row items-center gap-1.5" disabled={loadingInteractions}>
+          <MessageCircle 
+            size={20} 
+            color={commented ? '#3b82f6' : '#374151'}
+            fill={commented ? '#3b82f6' : 'transparent'}
+          />
           <Text className="text-sm text-gray-700">{commentCount}</Text>
         </Pressable>
-
-        <Pressable className="flex-row items-center gap-1.5">
-          <Share2 size={20} color="#374151" />
-          <Text className="text-sm text-gray-700">{shareCount}</Text>
-        </Pressable>
       </View>
-      <CommentsModal postId={post.id} visible={commentsVisible} onClose={closeComments} />
+      <CommentsModal 
+        postId={post.id} 
+        visible={commentsVisible} 
+        onClose={closeComments} 
+        onCommentCreated={refreshCommentCount}
+      />
     </View>
   );
 };

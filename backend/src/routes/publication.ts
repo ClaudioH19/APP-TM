@@ -25,5 +25,8 @@ router.get('/location', async (req, res) => {
 router.post('/', upload.single('file'), PublicationController.createPublication);
 router.get('/:id', PublicationController.getPublicationById);
 router.delete('/:id', PublicationController.deletePublication);
+router.post('/:id/interaccion', PublicationController.agregar_interaccion);
+router.post('/:id/desinteraccion', PublicationController.eliminar_interaccion);
+router.get('/:id/user-interactions', PublicationController.getUserInteractions);
 
 export default router;

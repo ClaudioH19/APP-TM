@@ -12,7 +12,7 @@ const CommentItem = ({ item }) => (
   </View>
 );
 
-export default function CommentsModal({ postId, visible, onClose }) {
+export default function CommentsModal({ postId, visible, onClose, onCommentCreated }) {
   const { comments, loading, error, creating, fetchComments, createComment } = useComments(postId);
   const [text, setText] = useState('');
 
@@ -21,6 +21,10 @@ export default function CommentsModal({ postId, visible, onClose }) {
     try {
       await createComment(text.trim());
       setText('');
+      // Notificar al parent que se creó un comentario
+      if (onCommentCreated) {
+        onCommentCreated();
+      }
     } catch (err) {
       // error handled in hook
     }
