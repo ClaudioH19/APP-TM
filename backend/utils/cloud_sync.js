@@ -25,11 +25,19 @@ async function syncCloudinary() {
     const LOCAL_MEDIA_DIR = path.resolve(__dirname, '..', 'media_local');
     if (!fs.existsSync(LOCAL_MEDIA_DIR)) fs.mkdirSync(LOCAL_MEDIA_DIR, { recursive: true });
 
+
     try {
-        // Obtener lista de recursos en Cloudinary
-        const { resources } = await cloudinary.api.resources({
-            type: 'upload',
-            max_results: 500
+        // Obtener lista de imágenes y videos en Cloudinary
+        const [imageRes, videoRes] = await Promise.all([
+            cloudinary.api.resources({ resource_type: 'image', type: 'upload', max_results: 500 }),
+            cloudinary.api.resources({ resource_type: 'video', type: 'upload', max_results: 500 })
+        ]);
+        const resources = [...imageRes.resources, ...videoRes.resources];
+
+        // Log de todos los recursos encontrados (formato y tipo)
+        console.log('[Cloud Sync] Recursos encontrados en Cloudinary:');
+        resources.forEach(file => {
+            console.log(`- public_id: ${file.public_id}, format: ${file.format}, resource_type: ${file.resource_type}`);
         });
 
         // Filtrar archivos para ignorar los que contengan 'samples' en su public_id

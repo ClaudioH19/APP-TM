@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Image, Pressable, ActivityIndicator } from 'react-native';
 import { Volume2, VolumeX } from 'lucide-react-native';
-import { Heart, MessageCircle, Share2 } from 'lucide-react-native';
+import { Heart, MessageCircle } from 'lucide-react-native';
+import CommentsModal from './CommentsModal';
 import { API_ENDPOINTS } from '../config/api';
 import { Video } from 'expo-av';
 import { Svg, Circle, Text as SvgText } from 'react-native-svg';
@@ -31,17 +32,13 @@ export const PostCard = ({ post }) => {
   // Estados para las interacciones
   const [liked, setLiked] = useState(false);
   const [commented, setCommented] = useState(false);
-  const [shared, setShared] = useState(false);
   
   // Estados para los contadores
   const [likeCount, setLikeCount] = useState(post.contador_likes ?? 0);
   const [commentCount, setCommentCount] = useState(post.contador_comentarios ?? 0);
-  const [shareCount, setShareCount] = useState(post.contador_compartidos ?? 0);
   
   // Estados para loading
   const [loadingLike, setLoadingLike] = useState(false);
-  const [loadingComment, setLoadingComment] = useState(false);
-  const [loadingShare, setLoadingShare] = useState(false);
   const [loadingInteractions, setLoadingInteractions] = useState(false);
   
   // Estados para video
@@ -56,17 +53,20 @@ export const PostCard = ({ post }) => {
       const interactions = await getUserInteractions(post.id);
       setLiked(interactions.hasLiked);
       setCommented(interactions.hasCommented);
-      setShared(interactions.hasShared);
     } catch (error) {
       console.error('Error cargando interacciones:', error);
     } finally {
       setLoadingInteractions(false);
     }
   };
+  const [commentsVisible, setCommentsVisible] = useState(false);
+  const openComments = () => setCommentsVisible(true);
+  const closeComments = () => setCommentsVisible(false);
 
   // Cargar interacciones al montar el componente
   useEffect(() => {
     loadUserInteractions();
+    refreshCommentCount(); // Cargar el contador real de comentarios
   }, [post.id]);
 
   // Like toggle seguro
@@ -89,7 +89,6 @@ export const PostCard = ({ post }) => {
         // Usar los contadores reales del backend
         setLikeCount(result.counters.likes);
         setCommentCount(result.counters.comments);
-        setShareCount(result.counters.shares);
       } else {
         // Revertir cambios si hay error
         setLiked(!newLiked);
@@ -105,72 +104,21 @@ export const PostCard = ({ post }) => {
     }
   };
 
-  // Comentario y compartir solo suman
-  const handleComment = async () => {
-    if (loadingComment) return;
-    console.log('Enviando comentario para post:', post.id);
-    setLoadingComment(true);
-    
-    // Actualizar optimisticamente
-    const previousCommentCount = commentCount;
-    setCommentCount(c => c + 1);
-    setCommented(true);
-    
+  // Función para actualizar el contador de comentarios desde el backend
+  const refreshCommentCount = async () => {
     try {
-      const result = await sendInteraccion(post.id, 2);
-      console.log('Respuesta comentario:', result);
-      
-      if (result.success && result.counters) {
-        // Usar los contadores reales del backend
-        setLikeCount(result.counters.likes);
-        setCommentCount(result.counters.comments);
-        setShareCount(result.counters.shares);
-      } else {
-        // Revertir si hay error
-        setCommentCount(previousCommentCount);
-        setCommented(false);
+      const response = await fetch(`${API_ENDPOINTS.COMMENTS}?publicacion_id=${post.id}`);
+      if (response.ok) {
+        const comments = await response.json();
+        setCommentCount(comments.length);
+        setCommented(comments.length > 0);
       }
-    } catch (e) {
-      console.error('Error al comentar:', e);
-      // Revertir si hay error
-      setCommentCount(previousCommentCount);
-      setCommented(false);
+    } catch (error) {
+      console.error('Error al actualizar contador de comentarios:', error);
     }
-    finally { setLoadingComment(false); }
   };
   
-  const handleShare = async () => {
-    if (loadingShare) return;
-    console.log('Enviando compartir para post:', post.id);
-    setLoadingShare(true);
-    
-    // Actualizar optimisticamente
-    const previousShareCount = shareCount;
-    setShareCount(c => c + 1);
-    setShared(true);
-    
-    try {
-      const result = await sendInteraccion(post.id, 3);
-      console.log('Respuesta compartir:', result);
-      
-      if (result.success && result.counters) {
-        // Usar los contadores reales del backend
-        setLikeCount(result.counters.likes);
-        setCommentCount(result.counters.comments);
-        setShareCount(result.counters.shares);
-      } else {
-        // Revertir si hay error
-        setShareCount(previousShareCount);
-        setShared(false);
-      }
-    } catch (e) {
-      console.error('Error al compartir:', e);
-      // Revertir si hay error
-      setShareCount(previousShareCount);
-      setShared(false);
-    }
-    finally { setLoadingShare(false); }
-  };
+
 
   return (
     <View className="bg-white">
@@ -192,11 +140,7 @@ export const PostCard = ({ post }) => {
           </View>
         </View>
 
-        <Pressable className="flex-row gap-1">
-          <Dot />
-          <Dot />
-          <Dot />
-        </Pressable>
+
       </View>
 
       {/* Ubicación */}
@@ -304,7 +248,7 @@ export const PostCard = ({ post }) => {
       ) : null}
 
       {/* Actions */}
-      <View className="flex-row items-center justify-between px-4 py-3">
+      <View className="flex-row items-center justify-between px-12 py-3">
         {loadingInteractions && (
           <View className="absolute right-4 top-3">
             <ActivityIndicator size="small" color="#9ca3af" />
@@ -319,24 +263,21 @@ export const PostCard = ({ post }) => {
           {loadingLike ? <ActivityIndicator size="small" color="#ef4444" /> : <Text className="text-sm text-gray-700">{likeCount}</Text>}
         </Pressable>
 
-        <Pressable onPress={handleComment} className="flex-row items-center gap-1.5" disabled={loadingComment || loadingInteractions}>
+        <Pressable onPress={openComments} className="flex-row items-center gap-1.5" disabled={loadingInteractions}>
           <MessageCircle 
             size={20} 
             color={commented ? '#3b82f6' : '#374151'}
             fill={commented ? '#3b82f6' : 'transparent'}
           />
-          {loadingComment ? <ActivityIndicator size="small" color="#3b82f6" /> : <Text className="text-sm text-gray-700">{commentCount}</Text>}
-        </Pressable>
-
-        <Pressable onPress={handleShare} className="flex-row items-center gap-1.5" disabled={loadingShare || loadingInteractions}>
-          <Share2 
-            size={20} 
-            color={shared ? '#10b981' : '#374151'}
-            fill={shared ? '#10b981' : 'transparent'}
-          />
-          {loadingShare ? <ActivityIndicator size="small" color="#10b981" /> : <Text className="text-sm text-gray-700">{shareCount}</Text>}
+          <Text className="text-sm text-gray-700">{commentCount}</Text>
         </Pressable>
       </View>
+      <CommentsModal 
+        postId={post.id} 
+        visible={commentsVisible} 
+        onClose={closeComments} 
+        onCommentCreated={refreshCommentCount}
+      />
     </View>
   );
 };

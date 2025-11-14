@@ -4,6 +4,7 @@ import publicationRouter from './publication';
 import interestPointRouter from './interest_point'; 
 import reviewRouter from './review'; 
 import usuarioRouter from './usuarios';
+import commentRouter from './comment';
 const router = Router();
 
 
@@ -15,6 +16,8 @@ router.get('/health', (req, res) => {
 router.use('/auth', authRouter);
 // Rutas de publicaciones
 router.use('/publications', publicationRouter);
+// Rutas de comentarios
+router.use('/comments', commentRouter);
 // Rutas de puntos de interés
 router.use('/interest_points', interestPointRouter);
 // Rutas de reseñas

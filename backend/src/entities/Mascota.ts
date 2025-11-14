@@ -16,6 +16,12 @@ export class Mascota {
   @Column({ type: 'text', nullable: true })
   descripcion!: string | null;
 
+  @Column({ type: 'date', nullable: true })
+  fecha_nacimiento!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  especie!: string | null;
+
   @ManyToOne(() => Usuario, (u: Usuario) => u.mascotas, { nullable: false, onDelete: 'CASCADE' })
   @Index('idx_mascota_usuario')
   @JoinColumn({ name: 'usuario_id' })
