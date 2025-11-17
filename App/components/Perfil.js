@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Image, FlatList, Pressable, ActivityIndicator, Dimensions, ScrollView, RefreshControl, Alert, TextInput, Modal } from 'react-native';
-import { Settings, Grid, Bookmark, Plus, Edit2, Trash2, X } from 'lucide-react-native';
+import { Settings, Grid, Bookmark, Plus, Edit2, Trash2, X, Camera } from 'lucide-react-native';
 import { PostCard } from './PostCard';
 import { API_ENDPOINTS } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Video } from 'expo-av';
+import * as ImagePicker from 'expo-image-picker';
+import { useCachedPosts } from '../hooks/useCachedPosts';
+import { avatarCache } from '../services/avatarCache';
 import twrnc from 'twrnc';
 
 const { width } = Dimensions.get('window');
@@ -11,22 +15,19 @@ const imageSize = width / 3;
 
 const Perfil = () => {
   const [user, setUser] = useState(null);
-  const [posts, setPosts] = useState([]);
-  const [pets, setPets] = useState([]); // Nuevo estado para mascotas
+  const [pets, setPets] = useState([]); 
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState('grid'); // 'grid', 'list' o 'pets'
+  const [activeTab, setActiveTab] = useState('grid');
   const [showPetModal, setShowPetModal] = useState(false);
   const [editingPet, setEditingPet] = useState(null);
   const [petForm, setPetForm] = useState({ nombre: '', especie: '', descripcion: '', fecha_nacimiento: '' });
-  const [savingPet, setSavingPet] = useState(false); // Nuevo estado para prevenir múltiples clicks
-  const [stats, setStats] = useState({
-    posts: 0,
-    pets: 0,
-    followers: 0,
-    following: 0
-  });
-
+  const [savingPet, setSavingPet] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  
+  // Primero cargamos el usuario
   useEffect(() => {
     fetchUserProfile();
   }, []);
@@ -35,7 +36,6 @@ const Perfil = () => {
     try {
       setLoading(true);
       
-      // Obtener información del usuario actual
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         console.error('No token found');
@@ -54,34 +54,6 @@ const Perfil = () => {
       const userData = await userResponse.json();
       setUser(userData.user);
 
-      // Obtener publicaciones del usuario usando endpoint específico
-      const postsResponse = await fetch(API_ENDPOINTS.PROFILE_POSTS, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      if (postsResponse.ok) {
-        const postsData = await postsResponse.json();
-        
-        // Enriquecer con nombre de ubicación
-        const enrichedPosts = await Promise.all(postsData.publicaciones.map(async post => {
-          if (post.ubicacion_lat && post.ubicacion_lon) {
-            try {
-              const locationResponse = await fetch(
-                `${API_ENDPOINTS.LOCATION}?lat=${post.ubicacion_lat}&lon=${post.ubicacion_lon}`
-              );
-              const locationData = await locationResponse.json();
-              return { ...post, ubicacion: locationData.name };
-            } catch (err) {
-              return post;
-            }
-          }
-          return post;
-        }));
-        
-        setPosts(enrichedPosts);
-      }
-
       // Obtener mascotas del usuario
       const petsResponse = await fetch(API_ENDPOINTS.PROFILE_PETS, {
         method: 'GET',
@@ -92,28 +64,27 @@ const Perfil = () => {
         const petsData = await petsResponse.json();
         setPets(petsData.mascotas || []);
       }
-      
-      // Actualizar estadísticas (se hará después de obtener los datos)
-      setTimeout(() => {
-        setStats({
-          posts: posts.length,
-          pets: pets.length,
-          followers: 0, // Por ahora estático
-          following: 0  // Por ahora estático
-        });
-      }, 100);
 
     } catch (error) {
       console.error('Error fetching user profile:', error);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
+  
+  // Usar hook de caché solo cuando user esté cargado
+  const { posts, refreshing, refresh: refreshPosts } = useCachedPosts(user?.usuario_id);
+  
+  const [stats, setStats] = useState({
+    posts: 0,
+    pets: 0,
+    followers: 0,
+    following: 0
+  });
 
   const onRefresh = () => {
-    setRefreshing(true);
-    fetchUserProfile();
+    refreshPosts(); // Usa el refresh del hook de caché
+    fetchUserProfile(); // Refresca usuario y mascotas
   };
 
   // Funciones para manejar mascotas
@@ -268,30 +239,237 @@ const Perfil = () => {
     );
   };
 
-  const renderGridItem = ({ item }) => {
-    const mediaUrl = item.id_video 
-      ? `${API_ENDPOINTS.MEDIA}/${item.id_video}${item.mime_type === 'image/jpg' || item.mime_type === 'image/jpeg' ? '.jpg' : item.mime_type === 'image/png' ? '.png' : '.mp4'}`
-      : null;
+  // Funciones para manejar avatar
+  const handleSelectAvatar = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso denegado', 'Se necesita permiso para acceder a las fotos');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await uploadAvatar(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error selecting avatar:', error);
+      Alert.alert('Error', 'Error al seleccionar imagen');
+    }
+  };
+
+  const uploadAvatar = async (uri) => {
+    try {
+      setUploadingAvatar(true);
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
+
+      const formData = new FormData();
+      const filename = uri.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+      formData.append('avatar', {
+        uri,
+        name: filename,
+        type
+      });
+
+      const response = await fetch(API_ENDPOINTS.AVATAR, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Invalidar caché de avatar para este usuario
+        avatarCache.invalidate(user.usuario_id);
+        
+        // Actualizar el usuario con el nuevo avatar
+        setUser(prevUser => ({
+          ...prevUser,
+          avatar: data.avatar,
+          avatarTimestamp: Date.now() // Agregar timestamp para cache busting
+        }));
+        setShowAvatarModal(false);
+        Alert.alert('Éxito', 'Avatar actualizado');
+      } else {
+        Alert.alert('Error', 'No se pudo actualizar el avatar');
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      Alert.alert('Error', 'Error al subir avatar');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleDeleteAvatar = async () => {
+    Alert.alert(
+      'Eliminar avatar',
+      '¿Estás seguro de que quieres eliminar tu foto de perfil?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setUploadingAvatar(true);
+              const token = await AsyncStorage.getItem('token');
+              if (!token) return;
+
+              const response = await fetch(API_ENDPOINTS.AVATAR, {
+                method: 'DELETE',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+
+              if (response.ok) {
+                // Invalidar caché de avatar para este usuario
+                avatarCache.invalidate(user.usuario_id);
+                
+                setUser(prevUser => ({
+                  ...prevUser,
+                  avatar: null,
+                  avatarTimestamp: Date.now() // Agregar timestamp para cache busting
+                }));
+                setShowAvatarModal(false);
+                Alert.alert('Éxito', 'Avatar eliminado');
+              } else {
+                Alert.alert('Error', 'No se pudo eliminar el avatar');
+              }
+            } catch (error) {
+              console.error('Error deleting avatar:', error);
+              Alert.alert('Error', 'Error al eliminar avatar');
+            } finally {
+              setUploadingAvatar(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const renderGridItem = ({ item, index }) => {
+    // Usar la misma lógica que PostCard para construir la URL
+    const id = item.id_video;
+    const mime = item.mime_type;
+
+    if (!id) {
+      return (
+        <View style={{ 
+          width: imageSize - 2, 
+          height: imageSize - 2, 
+          margin: 1,
+          backgroundColor: '#e5e7eb',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <Text style={{ color: '#9ca3af', fontSize: 12 }}>Sin media</Text>
+        </View>
+      );
+    }
+
+    // Mapeos de MIME a extensión (igual que PostCard)
+    const mimeToExt = {
+      'image/jpeg': 'jpg',
+      'image/jpg': 'jpg',
+      'image/png': 'png',
+      'image/gif': 'gif',
+      'image/webp': 'webp',
+      'image/heic': 'heic',
+      'video/mp4': 'mp4',
+      'video/quicktime': 'mov',
+      'video/x-m4v': 'm4v',
+      'video/webm': 'webm',
+      'video/x-msvideo': 'avi',
+      'video/3gpp': '3gp',
+    };
+
+    // Determinar extensión
+    let ext = '';
+    if (mime) {
+      ext = mimeToExt[mime] || '';
+      if (!ext) {
+        if (mime.startsWith('video')) ext = 'mp4';
+        else if (mime.startsWith('image')) ext = 'jpg';
+      }
+    }
+
+    // Si id ya tiene extensión, usarla
+    if (!ext && id.includes('.')) {
+      ext = id.split('.').pop().toLowerCase();
+    }
+
+    // Reconstruir nombre de archivo
+    const fileName = id.includes('.') || !ext ? id : `${id}.${ext}`;
+    const mediaUrl = `${API_ENDPOINTS.MEDIA}/${fileName}`;
+
+    // Verificar si es video
+    const videoExts = ['mp4', 'mov', 'm4v', '3gp', 'webm', 'avi'];
+    const isVideo = (mime && mime.startsWith('video')) || videoExts.includes(ext);
 
     return (
       <Pressable 
-        style={{ width: imageSize, height: imageSize, padding: 1 }}
+        style={{ 
+          width: imageSize - 2, 
+          height: imageSize - 2, 
+          margin: 1,
+          backgroundColor: '#000'
+        }}
         onPress={() => {
-          // Aquí podrías navegar a una vista detallada del post
-          console.log('Post clicked:', item.id);
+          setSelectedPost(item);
+          setShowPostModal(true);
         }}
       >
-        {mediaUrl ? (
-          <Image 
-            source={{ uri: mediaUrl }}
-            style={{ width: '100%', height: '100%' }}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={{ width: '100%', height: '100%', backgroundColor: '#e5e7eb', justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={{ color: '#9ca3af' }}>Sin imagen</Text>
-          </View>
-        )}
+        <View style={{ width: '100%', height: '100%', position: 'relative' }}>
+          {isVideo ? (
+            <Video
+              source={{ uri: mediaUrl }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+              shouldPlay={false}
+              isMuted={true}
+              isLooping={false}
+              useNativeControls={false}
+              onError={(error) => {
+                console.log('Error cargando video:', mediaUrl, error);
+              }}
+            />
+          ) : (
+            <Image 
+              source={{ uri: mediaUrl }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+              onError={(error) => {
+                console.log('Error cargando imagen:', mediaUrl, error.nativeEvent.error);
+              }}
+            />
+          )}
+          {isVideo && (
+            <View style={{ 
+              position: 'absolute', 
+              top: 8, 
+              right: 8, 
+              backgroundColor: 'rgba(0,0,0,0.6)', 
+              borderRadius: 4, 
+              padding: 4 
+            }}>
+              <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>▶</Text>
+            </View>
+          )}
+        </View>
       </Pressable>
     );
   };
@@ -350,6 +528,7 @@ const Perfil = () => {
         keyExtractor={(item) => activeTab === 'pets' ? item.mascota_id.toString() : item.id.toString()}
         numColumns={activeTab === 'grid' ? 3 : 1}
         key={activeTab} // Importante para forzar re-render al cambiar de tab
+        columnWrapperStyle={activeTab === 'grid' ? { justifyContent: 'flex-start' } : null}
         renderItem={
           activeTab === 'pets' ? renderPetItem :
           activeTab === 'grid' ? renderGridItem : renderListItem
@@ -362,13 +541,37 @@ const Perfil = () => {
             {/* Header con info del usuario */}
             <View style={twrnc`flex-row px-4 py-6 items-center`}>
               {/* Avatar */}
-              <View style={twrnc`mr-6`}>
-                <View style={twrnc`w-20 h-20 rounded-full bg-gray-300 items-center justify-center`}>
-                  <Text style={twrnc`text-2xl text-white font-bold`}>
-                    {user.nombre?.charAt(0).toUpperCase() || '?'}
-                  </Text>
+              <Pressable style={twrnc`mr-6`} onPress={() => setShowAvatarModal(true)}>
+                <View style={twrnc`w-20 h-20 rounded-full bg-gray-300 items-center justify-center overflow-hidden`}>
+                  {user.avatar && user.avatar.data ? (
+                    <Image 
+                      source={{ uri: `data:${user.avatar.mimeType};base64,${user.avatar.data}` }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Text style={twrnc`text-2xl text-white font-bold`}>
+                      {user.nombre?.charAt(0).toUpperCase() || '?'}
+                    </Text>
+                  )}
                 </View>
-              </View>
+                {/* Indicador de cámara */}
+                <View style={{ 
+                  position: 'absolute', 
+                  bottom: 0, 
+                  right: 0, 
+                  backgroundColor: '#3b82f6', 
+                  borderRadius: 12, 
+                  width: 24, 
+                  height: 24, 
+                  justifyContent: 'center', 
+                  alignItems: 'center',
+                  borderWidth: 2,
+                  borderColor: 'white'
+                }}>
+                  <Camera size={14} color="white" />
+                </View>
+              </Pressable>
 
               {/* Stats */}
               <View style={twrnc`flex-1 flex-row justify-around`}>
@@ -399,14 +602,7 @@ const Perfil = () => {
             </View>
 
             {/* Botones de acción */}
-            <View style={twrnc`px-4 pb-4 flex-row gap-2`}>
-              <Pressable style={twrnc`flex-1 bg-gray-200 py-2 rounded-lg items-center`}>
-                <Text style={twrnc`font-semibold`}>Editar perfil</Text>
-              </Pressable>
-              <Pressable style={twrnc`bg-gray-200 py-2 px-4 rounded-lg items-center`}>
-                <Settings size={20} color="#000" />
-              </Pressable>
-            </View>
+
 
             {/* Tabs */}
             <View style={twrnc`flex-row border-t border-gray-300`}>
@@ -552,6 +748,110 @@ const Perfil = () => {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Modal para mostrar post seleccionado */}
+      <Modal
+        visible={showPostModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          setShowPostModal(false);
+          setSelectedPost(null);
+        }}
+      >
+        <Pressable 
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 20 }}
+          onPress={() => {
+            setShowPostModal(false);
+            setSelectedPost(null);
+          }}
+        >
+          <Pressable 
+            style={{ backgroundColor: 'white', borderRadius: 12, maxHeight: '90%', overflow: 'hidden' }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* Header del modal */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' }}>
+              <Text style={{ fontSize: 18, fontWeight: '600' }}>Publicación</Text>
+              <Pressable onPress={() => {
+                setShowPostModal(false);
+                setSelectedPost(null);
+              }}>
+                <X size={24} color="#000" />
+              </Pressable>
+            </View>
+
+            {/* Contenido del post con ScrollView */}
+            {selectedPost && (
+              <ScrollView 
+                style={{ maxHeight: 600 }}
+                showsVerticalScrollIndicator={true}
+              >
+                <PostCard post={selectedPost} />
+              </ScrollView>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Modal para seleccionar/eliminar avatar */}
+      <Modal
+        visible={showAvatarModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowAvatarModal(false)}
+      >
+        <Pressable 
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
+          onPress={() => setShowAvatarModal(false)}
+        >
+          <Pressable 
+            style={{ backgroundColor: 'white', borderRadius: 12, width: '80%', padding: 20 }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 20, textAlign: 'center' }}>
+              Foto de perfil
+            </Text>
+
+            {uploadingAvatar ? (
+              <View style={{ paddingVertical: 20 }}>
+                <ActivityIndicator size="large" color="#3b82f6" />
+              </View>
+            ) : (
+              <View style={{ gap: 12 }}>
+                <Pressable
+                  style={{ backgroundColor: '#3b82f6', padding: 16, borderRadius: 8, alignItems: 'center' }}
+                  onPress={handleSelectAvatar}
+                >
+                  <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>
+                    Seleccionar foto
+                  </Text>
+                </Pressable>
+
+                {user.avatar && (
+                  <Pressable
+                    style={{ backgroundColor: '#ef4444', padding: 16, borderRadius: 8, alignItems: 'center' }}
+                    onPress={handleDeleteAvatar}
+                  >
+                    <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>
+                      Eliminar foto actual
+                    </Text>
+                  </Pressable>
+                )}
+
+                <Pressable
+                  style={{ backgroundColor: '#e5e7eb', padding: 16, borderRadius: 8, alignItems: 'center' }}
+                  onPress={() => setShowAvatarModal(false)}
+                >
+                  <Text style={{ color: '#374151', fontSize: 16, fontWeight: '600' }}>
+                    Cancelar
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );

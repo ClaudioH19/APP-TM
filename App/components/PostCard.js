@@ -7,6 +7,7 @@ import { API_ENDPOINTS } from '../config/api';
 import { Video } from 'expo-av';
 import { Svg, Circle, Text as SvgText } from 'react-native-svg';
 import { sendInteraccion, getUserInteractions } from '../services/interaccion_service';
+import { avatarCache } from '../services/avatarCache';
 
 const Dot = ({ color = 'bg-gray-600' }) => (
   <View className={`w-1 h-1 ${color} rounded-full`} />
@@ -46,6 +47,10 @@ export const PostCard = ({ post }) => {
   const [muted, setMuted] = useState(true);
   const toggleMute = () => setMuted(m => !m);
 
+  // Estado para avatar
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [avatarError, setAvatarError] = useState(false);
+
   // Función para cargar las interacciones del usuario
   const loadUserInteractions = async () => {
     setLoadingInteractions(true);
@@ -67,7 +72,14 @@ export const PostCard = ({ post }) => {
   useEffect(() => {
     loadUserInteractions();
     refreshCommentCount(); // Cargar el contador real de comentarios
-  }, [post.id]);
+    
+    // Cargar avatar si existe el usuario
+    if (post.usuario?.usuario_id) {
+      const baseUrl = API_ENDPOINTS.USER_AVATAR(post.usuario.usuario_id);
+      const urlWithCache = avatarCache.getAvatarUrl(post.usuario.usuario_id, baseUrl);
+      setAvatarUrl(urlWithCache);
+    }
+  }, [post.id, post.usuario?.usuario_id]);
 
   // Like toggle seguro
   const handleLike = async () => {
@@ -125,14 +137,19 @@ export const PostCard = ({ post }) => {
       {/* Header */}
       <View className="flex-row items-center justify-between px-4 py-3">
         <View className="flex-row items-center gap-3">
-          {post.usuario?.avatar ? (
+          {avatarUrl && !avatarError ? (
             <Image
-              source={{ uri: post.usuario.avatar }}
+              source={{ uri: avatarUrl }}
               alt={post.usuario?.nombre}
               className="w-10 h-10 rounded-full"
+              onError={() => setAvatarError(true)}
             />
           ) : (
-            <DefaultAvatar />
+            <View className="w-10 h-10 rounded-full bg-gray-300 items-center justify-center">
+              <Text className="text-white font-bold text-lg">
+                {post.usuario?.nombre?.charAt(0).toUpperCase() || '?'}
+              </Text>
+            </View>
           )}
           <View>
             <Text className="font-semibold text-sm">{post.usuario?.nombre}</Text>
