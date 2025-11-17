@@ -2,13 +2,13 @@ import { get } from "http";
 import { AppDataSource } from "../data-source";
 import { Mascota, Publicacion, Usuario} from "../entities";
 
-export async function crearMascotaParaUsuario(usuario: Usuario, nombre: string, tipo: string, raza: string, edad: number): Promise<Mascota> {
+export async function crearMascotaParaUsuario(usuario: Usuario, nombre: string, especie: string, descripcion: string | null, fecha_nacimiento: string | null): Promise<Mascota> {
     const mascotaRepository = AppDataSource.getRepository(Mascota);
     const nuevaMascota = mascotaRepository.create({
         nombre,
-        descripcion: null,
-        fecha_nacimiento: null,
-        especie: tipo,
+        descripcion,
+        fecha_nacimiento: fecha_nacimiento ? new Date(fecha_nacimiento) : null,
+        especie,
         usuario,
         recorridos: [],
         historial: [],

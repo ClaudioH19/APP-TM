@@ -30,8 +30,8 @@ export class PerfilController {
         await verifyToken(token);
         const user = await getUserFromToken(token);
         if (!user) return res.status(404).json({ error: 'Usuario no encontrado' }); 
-        const { nombre, tipo, raza, edad } = req.body;
-        const nuevaMascota = await crearMascotaParaUsuario(user, nombre, tipo, raza, edad);
+        const { nombre, especie, descripcion, fecha_nacimiento } = req.body;
+        const nuevaMascota = await crearMascotaParaUsuario(user, nombre, especie, descripcion, fecha_nacimiento);
         return res.json({ mascota: nuevaMascota });
     } catch (err: any) {
       return res.status(401).json({ error: err.message || 'Token inválido' });
