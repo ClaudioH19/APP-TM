@@ -7,8 +7,9 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import { X, MapPin, Calendar, MessageSquare, Star, Tag, ChevronRight } from 'lucide-react-native';
+import { X, MapPin, Calendar, MessageSquare, Star, Tag, ChevronRight, Plus } from 'lucide-react-native';
 import ReviewsModal from './ReviewsModal';
+import AddReviewModal from './AddReviewModal';
 
 /**
  * Formatea la fecha de creación
@@ -42,6 +43,7 @@ const getCategoryColor = (category) => {
 
 const PointDetailModal = ({ visible, point, onClose }) => {
   const [showReviewsModal, setShowReviewsModal] = useState(false);
+  const [showAddReviewModal, setShowAddReviewModal] = useState(false);
   
   if (!point) return null;
 
@@ -114,6 +116,17 @@ const PointDetailModal = ({ visible, point, onClose }) => {
                   <ChevronRight size={20} color="#3b82f6" />
                 </TouchableOpacity>
               )}
+              
+              {/* Botón para añadir reseña */}
+              <TouchableOpacity
+                style={styles.addReviewButton}
+                onPress={() => setShowAddReviewModal(true)}
+              >
+                <Plus size={20} color="#fff" />
+                <Text style={styles.addReviewButtonText}>
+                  Añadir Reseña
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {/* Fecha de creación */}
@@ -167,6 +180,20 @@ const PointDetailModal = ({ visible, point, onClose }) => {
         pointId={point.id}
         pointName={point.title}
         onClose={() => setShowReviewsModal(false)}
+      />
+      
+      {/* Modal para añadir reseña */}
+      <AddReviewModal
+        visible={showAddReviewModal}
+        pointId={point.id}
+        pointName={point.title}
+        onClose={() => setShowAddReviewModal(false)}
+        onReviewAdded={() => {
+          // Cerrar modal de añadir reseña y recargar datos si es necesario
+          setShowAddReviewModal(false);
+          // Si el modal de reseñas está abierto, podría necesitar refrescarse
+          // pero por ahora solo cerramos y el usuario puede volver a abrir
+        }}
       />
     </Modal>
   );
@@ -287,6 +314,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#3b82f6',
+  },
+  addReviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3b82f6',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 8,
+  },
+  addReviewButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
   },
   description: {
     fontSize: 16,

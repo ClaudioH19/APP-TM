@@ -159,3 +159,54 @@ export const getReviews = async (pointId, index = 0, limit = 10) => {
     throw error;
   }
 };
+
+/**
+ * Crea una nueva reseña para un punto de interés
+ * @param {number} pointId - ID del punto de interés
+ * @param {number} rating - Valoración de 1 a 5
+ * @param {string} description - Comentario opcional del usuario
+ * @returns {Promise<Object>} Reseña creada
+ */
+export const addReview = async (pointId, rating, description) => {
+  try {
+    const token = await AsyncStorage.getItem('token');
+
+    if (!token) {
+      throw new Error('Debes iniciar sesión para dejar una reseña.');
+    }
+
+    if (!pointId) {
+      throw new Error('No se pudo identificar el punto de interés.');
+    }
+
+    if (!rating || rating < 1 || rating > 5) {
+      throw new Error('Selecciona una calificación entre 1 y 5.');
+    }
+
+    const body = {
+      puntoInteresId: pointId,
+      valoracion: rating,
+      descripcion: description?.trim() || undefined,
+    };
+
+    const response = await fetch(API_ENDPOINTS.REVIEWS, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data.message || data.error || 'No se pudo crear la reseña.');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error añadiendo reseña:', error);
+    throw error;
+  }
+};
