@@ -121,3 +121,92 @@ export const formatPointsForMap = (points) => {
     createdAt: point.fecha_creacion,
   }));
 };
+
+/**
+ * Obtiene las reseñas de un punto de interés (paginadas)
+ * @param {number} pointId - ID del punto de interés
+ * @param {number} index - Índice de paginación (default: 0)
+ * @param {number} limit - Límite de resultados (default: 10)
+ * @returns {Promise<Object>} Objeto con items, total, offset y limit
+ */
+export const getReviews = async (pointId, index = 0, limit = 10) => {
+  try {
+    const token = await AsyncStorage.getItem('token');
+    
+    if (!token) {
+      throw new Error('No hay sesión activa. Por favor inicia sesión.');
+    }
+
+    const url = `${API_ENDPOINTS.REVIEWS}/${pointId}?index=${index}&limit=${limit}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Error HTTP: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error obteniendo reseñas:', error);
+    throw error;
+  }
+};
+
+/**
+ * Crea una nueva reseña para un punto de interés
+ * @param {number} pointId - ID del punto de interés
+ * @param {number} rating - Valoración de 1 a 5
+ * @param {string} description - Comentario opcional del usuario
+ * @returns {Promise<Object>} Reseña creada
+ */
+export const addReview = async (pointId, rating, description) => {
+  try {
+    const token = await AsyncStorage.getItem('token');
+
+    if (!token) {
+      throw new Error('Debes iniciar sesión para dejar una reseña.');
+    }
+
+    if (!pointId) {
+      throw new Error('No se pudo identificar el punto de interés.');
+    }
+
+    if (!rating || rating < 1 || rating > 5) {
+      throw new Error('Selecciona una calificación entre 1 y 5.');
+    }
+
+    const body = {
+      puntoInteresId: pointId,
+      valoracion: rating,
+      descripcion: description?.trim() || undefined,
+    };
+
+    const response = await fetch(API_ENDPOINTS.REVIEWS, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data.message || data.error || 'No se pudo crear la reseña.');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error añadiendo reseña:', error);
+    throw error;
+  }
+};
