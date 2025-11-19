@@ -2,8 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, Index, JoinColumn } 
 import { Publicacion } from './Publicacion';
 import { Usuario } from './Usuario';
 
-@Index('idx_com_pub', ['publicacion'])
-@Index('idx_com_usuario', ['usuario'])
+
 @Entity('interaccion')
 export class Interaccion {
   @PrimaryGeneratedColumn()

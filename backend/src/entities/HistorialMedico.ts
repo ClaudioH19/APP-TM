@@ -22,6 +22,14 @@ export class HistorialMedico {
   @Column({ type: 'text', nullable: true })
   descripcion!: string | null;
 
+  // estado del evento: pendiente, completada o cancelada
+  @Column({
+    type: 'varchar',
+    length: 20,
+    default: 'pendiente',
+  })
+  estado!: 'pendiente' | 'completado' | 'cancelado';
+
   // lat/lon genéricos
   @Column({ type: 'float', nullable: true })
   ubicacion_clinica_lat!: number | null;

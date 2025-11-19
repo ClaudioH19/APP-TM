@@ -2,8 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, Index } from 'typeor
 import { Publicacion } from './Publicacion';
 import { Usuario } from './Usuario';
 
-@Index('idx_com_pub', ['publicacion'])
-@Index('idx_com_usuario', ['usuario'])
+
 @Entity('comentario')
 export class Comentario {
   @PrimaryGeneratedColumn()
