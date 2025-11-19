@@ -55,7 +55,19 @@ export class MascotaService {
     async obtenerMascotasPorUsuario(usuario_id: number) {
         return await this.mascotaRepository.find({
             where: { usuario: { usuario_id } },
-            relations: ['usuario']
+            relations: ['usuario'],
+            select: {
+                mascota_id: true,
+                nombre: true,
+                descripcion: true,
+                fecha_nacimiento: true,
+                especie: true,
+                usuario: {
+                    usuario_id: true,
+                    usuario: true,  
+                    nombre: true    
+                }
+            }
         });
     }
 
