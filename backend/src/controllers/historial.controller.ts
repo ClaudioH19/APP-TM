@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { createHistorial, listHistorialByMascota, listHistorialByUsuario, updateHistorialIfFuture, removeHistorial } from '../services/historial.service';
+import { crearHistorial, listaHistorialPorMascota, listHistorialByUsuario, updateHistorialIfFuture, removeHistorial } from '../services/historial.service';
+import { obtenerGruposTiposEventoParaUI } from '../config/historial_categorias';
 
 function parseFechaHora(body: any): Date | null {
   if (body.fecha && body.hora) return new Date(`${body.fecha}T${body.hora}:00`);
@@ -18,7 +19,7 @@ export class HistorialController {
       const when = parseFechaHora(req.body);
       if (!when || isNaN(+when)) return res.status(400).json({ message: 'Fecha/hora inválida' });
 
-      const item = await createHistorial({
+      const item = await crearHistorial({
         mascotaId,
         propietarioId: req.user.usuario_id,
         categoria: String(req.body.categoria || ''),
@@ -40,7 +41,7 @@ export class HistorialController {
       if (!req.user) return res.status(401).json({ message: 'No autorizado' });
       const mascotaId = Number(req.params.id);
       if (!Number.isInteger(mascotaId)) return res.status(400).json({ message: 'MascotaId inválido' });
-      const items = await listHistorialByMascota(mascotaId, req.user.usuario_id);
+      const items = await listaHistorialPorMascota(mascotaId, req.user.usuario_id);
       return res.json(items);
     } catch (e: any) {
       return res.status(e?.message === 'No autorizado' ? 403 : 400).json({ message: e?.message || 'Error' });
@@ -56,6 +57,16 @@ export class HistorialController {
       return res.json(data);
     } catch (e: any) {
       return res.status(400).json({ message: e?.message || 'Error' });
+    }
+  }
+
+  static async getCategorias(req: any, res: Response) {
+    try {
+      if (!req.user) return res.status(401).json({ message: 'No autorizado' });
+      const data = obtenerGruposTiposEventoParaUI();
+      return res.json(data);
+    } catch (e: any) {
+      return res.status(500).json({ message: e?.message || 'Error' });
     }
   }
 

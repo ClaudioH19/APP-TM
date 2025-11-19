@@ -11,18 +11,18 @@ export class HistorialMedico {
   @Column({ type: 'timestamp' })
   fecha!: Date;
 
-  // NUEVO: categoría del evento (vacuna, control, paseo, etc.)
+  // categoría del evento (vacuna, control, paseo, etc.)
   @Column({ type: 'varchar', length: 50, nullable: true })
   categoria!: string | null;
 
-  // NUEVO: campos opcionales para mostrar en el UI
+  // campos opcionales para mostrar en el UI
   @Column({ type: 'varchar', length: 120, nullable: true })
   titulo!: string | null;
 
   @Column({ type: 'text', nullable: true })
   descripcion!: string | null;
 
-  // Reusamos estos como lat/lon genéricos
+  // lat/lon genéricos
   @Column({ type: 'float', nullable: true })
   ubicacion_clinica_lat!: number | null;
 
@@ -30,6 +30,6 @@ export class HistorialMedico {
   ubicacion_clinica_lon!: number | null;
 
   @ManyToOne(() => Mascota, (m: Mascota) => m.historial, { nullable: false, onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'mascota_id' })
+  @JoinColumn({ name: 'mascotaMascotaId' })
   mascota!: Mascota;
 }

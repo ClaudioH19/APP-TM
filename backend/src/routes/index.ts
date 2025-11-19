@@ -6,6 +6,7 @@ import reviewRouter from './review';
 import usuarioRouter from './usuarios';
 import commentRouter from './comment';
 import mascotasRouter from './mascota';
+import historialRouter from './historial';
 const router = Router();
 
 
@@ -24,6 +25,8 @@ router.use('/interest_points', interestPointRouter);
 // Rutas de reseñas
 router.use('/reviews', reviewRouter);
 router.use('/usuarios', usuarioRouter);
+router.use('/mascotas', mascotasRouter);
+router.use('/', historialRouter);
 
 
 export default router;

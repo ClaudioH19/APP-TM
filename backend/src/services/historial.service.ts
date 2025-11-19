@@ -1,6 +1,7 @@
 import { AppDataSource } from '../data-source';
 import { HistorialMedico } from '../entities/HistorialMedico';
 import { Mascota } from '../entities/Mascota';
+import { esTipoEventoPermitido, normalizarTipoEvento } from '../config/historial_categorias';
 
 export async function crearHistorial(params: {
   mascotaId: number;
@@ -11,7 +12,7 @@ export async function crearHistorial(params: {
   descripcion?: string | null;
   lat?: number | null;
   lon?: number | null;
-}): Promise<HistorialMedico> {
+}): Promise<any> {
   const mascotaRepo = AppDataSource.getRepository(Mascota);
   const historialRepo = AppDataSource.getRepository(HistorialMedico);
 
@@ -31,19 +32,40 @@ export async function crearHistorial(params: {
   if (lat !== null && !Number.isFinite(lat)) throw new Error('Latitud inválida');
   if (lon !== null && !Number.isFinite(lon)) throw new Error('Longitud inválida');
 
-  const cat = (params.categoria || '').trim();
-  if (!cat) throw new Error('La categoría es obligatoria');
+  // Validación de categoría
+  const catNorm = normalizarTipoEvento(params.categoria);
+  if (!catNorm) throw new Error('La categoría es obligatoria');
+  if (!esTipoEventoPermitido(catNorm)) throw new Error('Categoría inválida');
 
-  const item = historialRepo.create({
+  const entity = historialRepo.create({
     mascota,
     fecha,
-    categoria: cat,
+    categoria: catNorm,
     titulo: params.titulo ?? null,
     descripcion: params.descripcion ?? null,
     ubicacion_clinica_lat: lat,
-    ubicacion_clinica_lon: lon
+    ubicacion_clinica_lon: lon,
   });
-  return historialRepo.save(item);
+
+  const saved = await historialRepo.save(entity);
+
+
+  return {
+    id: saved.id,
+    fecha: saved.fecha,
+    categoria: saved.categoria,
+    titulo: saved.titulo,
+    descripcion: saved.descripcion,
+    ubicacion_clinica_lat: saved.ubicacion_clinica_lat,
+    ubicacion_clinica_lon: saved.ubicacion_clinica_lon,
+    mascota: {
+      mascota_id: mascota.mascota_id,
+      nombre: mascota.nombre,
+      descripcion: mascota.descripcion,
+      fecha_nacimiento: mascota.fecha_nacimiento,
+      especie: mascota.especie,
+    },
+  };
 }
 
 export async function listaHistorialPorMascota(mascotaId: number, propietarioId: number) {
@@ -68,14 +90,46 @@ export async function listHistorialByUsuario(propietarioId: number, offset = 0, 
   const repo = AppDataSource.getRepository(HistorialMedico);
   const safeOff = Math.max(0, Math.floor(Number(offset) || 0));
   const safeLim = Math.max(1, Math.min(100, Math.floor(Number(limit) || 50)));
-  const [items, total] = await repo.findAndCount({
+
+  const [itemsRaw, total] = await repo.findAndCount({
     where: { mascota: { usuario: { usuario_id: propietarioId } as any } as any },
-    order: { fecha: 'ASC' },
-    skip: safeOff,
-    take: safeLim,
-    relations: { mascota: true }
+    relations: { mascota: true },
   });
-  return { items, total };
+
+  const now = new Date();
+  // ordenar: futuros primero ascendente, luego pasados descendente
+  const futuros = itemsRaw
+    .filter(i => i.fecha >= now)
+    .sort((a, b) => +a.fecha - +b.fecha); 
+
+  const pasados = itemsRaw
+    .filter(i => i.fecha < now)
+    .sort((a, b) => +b.fecha - +a.fecha); 
+
+  const ordered = [...futuros, ...pasados];
+
+  // aplicar paginación después de ordenar
+  const items = ordered.slice(safeOff, safeOff + safeLim);
+
+  // mapeao para evitar exponer datos sensibles
+  const sanitized = items.map(i => ({
+    id: i.id,
+    fecha: i.fecha,
+    categoria: i.categoria,
+    titulo: i.titulo,
+    descripcion: i.descripcion,
+    ubicacion_clinica_lat: i.ubicacion_clinica_lat,
+    ubicacion_clinica_lon: i.ubicacion_clinica_lon,
+    mascota: {
+      mascota_id: i.mascota.mascota_id,
+      nombre: i.mascota.nombre,
+      descripcion: i.mascota.descripcion,
+      fecha_nacimiento: i.mascota.fecha_nacimiento,
+      especie: i.mascota.especie,
+    },
+  }));
+
+  return { items: sanitized, total };
 }
 
 export async function updateHistorialIfFuture(id: number, propietarioId: number, patch: {
@@ -98,7 +152,20 @@ export async function updateHistorialIfFuture(id: number, propietarioId: number,
     if (isNaN(+f)) throw new Error('Fecha inválida');
     item.fecha = f;
   }
-  if (patch.categoria !== undefined) item.categoria = patch.categoria?.trim() || null;
+  if (patch.categoria !== undefined) {
+    if (patch.categoria === null) {
+      item.categoria = null;
+    } else {
+      const catNorm = normalizarTipoEvento(patch.categoria);
+      if (!catNorm) {
+        // cadena vacía => limpiar categoría
+        item.categoria = null;
+      } else {
+        if (!esTipoEventoPermitido(catNorm)) throw new Error('Categoría inválida');
+        item.categoria = catNorm;
+      }
+    }
+  }
   if (patch.titulo !== undefined) item.titulo = patch.titulo ?? null;
   if (patch.descripcion !== undefined) item.descripcion = patch.descripcion ?? null;
 
@@ -111,7 +178,24 @@ export async function updateHistorialIfFuture(id: number, propietarioId: number,
     item.ubicacion_clinica_lon = patch.lon ?? null;
   }
 
-  return repo.save(item);
+  const saved = await repo.save(item);
+
+  return {
+    id: saved.id,
+    fecha: saved.fecha,
+    categoria: saved.categoria,
+    titulo: saved.titulo,
+    descripcion: saved.descripcion,
+    ubicacion_clinica_lat: saved.ubicacion_clinica_lat,
+    ubicacion_clinica_lon: saved.ubicacion_clinica_lon,
+    mascota: {
+      mascota_id: item.mascota.mascota_id,
+      nombre: item.mascota.nombre,
+      descripcion: item.mascota.descripcion,
+      fecha_nacimiento: item.mascota.fecha_nacimiento,
+      especie: item.mascota.especie,
+    },
+  };
 }
 
 export async function removeHistorial(id: number, propietarioId: number) {
