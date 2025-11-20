@@ -26,6 +26,7 @@ export class HistorialController {
         fecha: when,
         titulo: req.body.titulo,
         descripcion: req.body.descripcion,
+        estado: req.body.estado,
         lat: req.body.lat !== undefined ? (req.body.lat === null ? null : Number(req.body.lat)) : null,
         lon: req.body.lon !== undefined ? (req.body.lon === null ? null : Number(req.body.lon)) : null
       });
@@ -82,6 +83,7 @@ export class HistorialController {
         categoria: req.body.categoria,
         titulo: req.body.titulo,
         descripcion: req.body.descripcion,
+        estado: req.body.estado,
         lat: req.body.lat === undefined ? undefined : (req.body.lat === null ? null : Number(req.body.lat)),
         lon: req.body.lon === undefined ? undefined : (req.body.lon === null ? null : Number(req.body.lon))
       };

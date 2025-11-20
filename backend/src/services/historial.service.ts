@@ -10,6 +10,7 @@ export async function crearHistorial(params: {
   fecha: Date;
   titulo?: string | null;
   descripcion?: string | null;
+  estado?: 'pendiente' | 'completado' | 'cancelado' | 'vencido';
   lat?: number | null;
   lon?: number | null;
 }): Promise<any> {
@@ -43,6 +44,7 @@ export async function crearHistorial(params: {
     categoria: catNorm,
     titulo: params.titulo ?? null,
     descripcion: params.descripcion ?? null,
+    estado: params.estado ?? 'pendiente',
     ubicacion_clinica_lat: lat,
     ubicacion_clinica_lon: lon,
   });
@@ -54,6 +56,7 @@ export async function crearHistorial(params: {
     id: saved.id,
     fecha: saved.fecha,
     categoria: saved.categoria,
+    estado: saved.estado,
     titulo: saved.titulo,
     descripcion: saved.descripcion,
     ubicacion_clinica_lat: saved.ubicacion_clinica_lat,
@@ -97,6 +100,22 @@ export async function listHistorialByUsuario(propietarioId: number, offset = 0, 
   });
 
   const now = new Date();
+
+  const eventosVencidos = itemsRaw.filter(i => 
+    i.estado === 'pendiente' && i.fecha < now
+  );
+
+  if (eventosVencidos.length > 0) {
+    const idsVencidos = eventosVencidos.map(i => i.id);
+
+    // actualización de estado a 'vencido' para eventos pasados
+    await repo.update(idsVencidos, { estado: 'vencido' });
+
+    // se actualiza en memoria también
+    eventosVencidos.forEach(evento => {
+      evento.estado = 'vencido';
+    });
+  }
   // ordenar: futuros primero ascendente, luego pasados descendente
   const futuros = itemsRaw
     .filter(i => i.fecha >= now)
@@ -111,11 +130,12 @@ export async function listHistorialByUsuario(propietarioId: number, offset = 0, 
   // aplicar paginación después de ordenar
   const items = ordered.slice(safeOff, safeOff + safeLim);
 
-  // mapeao para evitar exponer datos sensibles
+  // mapeao para evitar exponer datos innecesarios
   const sanitized = items.map(i => ({
     id: i.id,
     fecha: i.fecha,
     categoria: i.categoria,
+    estado: i.estado,
     titulo: i.titulo,
     descripcion: i.descripcion,
     ubicacion_clinica_lat: i.ubicacion_clinica_lat,
@@ -137,6 +157,7 @@ export async function updateHistorialIfFuture(id: number, propietarioId: number,
   categoria?: string | null;
   titulo?: string | null;
   descripcion?: string | null;
+  estado?: 'pendiente' | 'completado' | 'cancelado' | 'vencido';
   lat?: number | null;
   lon?: number | null;
 }) {
@@ -168,7 +189,13 @@ export async function updateHistorialIfFuture(id: number, propietarioId: number,
   }
   if (patch.titulo !== undefined) item.titulo = patch.titulo ?? null;
   if (patch.descripcion !== undefined) item.descripcion = patch.descripcion ?? null;
-
+  if (patch.estado !== undefined) {
+      const validos = ['pendiente', 'completado', 'cancelado', 'vencido'];
+      if (!validos.includes(patch.estado)) {
+          throw new Error('Estado inválido');
+      }
+      item.estado = patch.estado;
+  }
   if (patch.lat !== undefined) {
     if (patch.lat !== null && !Number.isFinite(patch.lat)) throw new Error('Latitud inválida');
     item.ubicacion_clinica_lat = patch.lat ?? null;

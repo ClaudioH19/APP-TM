@@ -28,7 +28,7 @@ export class HistorialMedico {
     length: 20,
     default: 'pendiente',
   })
-  estado!: 'pendiente' | 'completado' | 'cancelado';
+  estado!: 'pendiente' | 'completado' | 'cancelado'| 'vencido';
 
   // lat/lon genéricos
   @Column({ type: 'float', nullable: true })
