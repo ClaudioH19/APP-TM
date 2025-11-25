@@ -1,5 +1,13 @@
 import { Request, Response } from 'express';
-import { crearHistorial, listaHistorialPorMascota, listHistorialByUsuario, updateHistorialIfFuture, removeHistorial } from '../services/historial.service';
+import {
+  crearHistorial,
+  listaHistorialPorMascota,
+  listHistorialByUsuario,
+  updateHistorialIfFuture,
+  removeHistorial,
+  cambiarEstadoHistorial,
+  ESTADOS_HISTORIAL,
+} from '../services/historial.service';
 import { obtenerGruposTiposEventoParaUI } from '../config/historial_categorias';
 
 function parseFechaHora(body: any): Date | null {
@@ -107,6 +115,48 @@ export class HistorialController {
     } catch (e: any) {
       const msg = e?.message || 'Error';
       return res.status(msg === 'No autorizado' ? 403 : 400).json({ message: msg });
+    }
+  }
+
+  static async cambiarEstado(req: any, res: Response) {
+    try {
+      if (!req.user) return res.status(401).json({ message: 'No autorizado' });
+
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id)) {
+        return res.status(400).json({ message: 'ID inválido' });
+      }
+
+      const estado = String(req.body.estado ?? '').trim();
+      if (!ESTADOS_HISTORIAL.includes(estado as any)) {
+        return res
+          .status(400)
+          .json({ message: `Estado inválido. Permitidos: ${ESTADOS_HISTORIAL.join(', ')}` });
+      }
+
+      const updated = await cambiarEstadoHistorial(
+        id,
+        req.user.usuario_id,
+        estado as any,
+      );
+
+      return res.json(updated);
+    } catch (e: any) {
+      const msg = e?.message || 'Error';
+      const code =
+        msg === 'No autorizado' ? 403 :
+        msg === 'Evento no encontrado' ? 404 : 400;
+      return res.status(code).json({ message: msg });
+    }
+  }
+
+  //  diccionario de estados permitidos
+  static async getEstados(req: any, res: Response) {
+    try {
+      if (!req.user) return res.status(401).json({ message: 'No autorizado' });
+      return res.json(ESTADOS_HISTORIAL);
+    } catch (e: any) {
+      return res.status(500).json({ message: e?.message || 'Error' });
     }
   }
 }

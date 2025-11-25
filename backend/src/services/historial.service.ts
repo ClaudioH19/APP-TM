@@ -1,7 +1,15 @@
-import { AppDataSource } from '../data-source';
-import { HistorialMedico } from '../entities/HistorialMedico';
-import { Mascota } from '../entities/Mascota';
 import { esTipoEventoPermitido, normalizarTipoEvento } from '../config/historial_categorias';
+import { HistorialMedico } from '../entities/HistorialMedico';
+import { AppDataSource } from '../data-source';
+import { Mascota } from '../entities/Mascota';
+
+export const ESTADOS_HISTORIAL = [
+  'pendiente',
+  'completado',
+  'cancelado',
+  'vencido',
+] as const;
+export type EstadoHistorial = (typeof ESTADOS_HISTORIAL)[number];
 
 export async function crearHistorial(params: {
   mascotaId: number;
@@ -33,7 +41,7 @@ export async function crearHistorial(params: {
   if (lat !== null && !Number.isFinite(lat)) throw new Error('Latitud inválida');
   if (lon !== null && !Number.isFinite(lon)) throw new Error('Longitud inválida');
 
-  // Validación de categoría
+  // se valida la categoria
   const catNorm = normalizarTipoEvento(params.categoria);
   if (!catNorm) throw new Error('La categoría es obligatoria');
   if (!esTipoEventoPermitido(catNorm)) throw new Error('Categoría inválida');
@@ -213,6 +221,7 @@ export async function updateHistorialIfFuture(id: number, propietarioId: number,
     categoria: saved.categoria,
     titulo: saved.titulo,
     descripcion: saved.descripcion,
+    estado: saved.estado,
     ubicacion_clinica_lat: saved.ubicacion_clinica_lat,
     ubicacion_clinica_lon: saved.ubicacion_clinica_lon,
     mascota: {
@@ -232,4 +241,49 @@ export async function removeHistorial(id: number, propietarioId: number) {
   const ownerId = (item.mascota as any).usuario?.usuario_id;
   if (ownerId !== propietarioId) throw new Error('No autorizado');
   await repo.remove(item);
+}
+
+export async function cambiarEstadoHistorial(
+  id: number,
+  propietarioId: number,
+  estado: EstadoHistorial,
+) {
+  if (!ESTADOS_HISTORIAL.includes(estado)) {
+    throw new Error('Estado inválido');
+  }
+
+  const repo = AppDataSource.getRepository(HistorialMedico);
+  const item = await repo.findOne({
+    where: { id },
+    relations: { mascota: { usuario: true } } as any,
+  });
+
+  if (!item) throw new Error('Evento no encontrado');
+
+  const ownerId = (item.mascota as any).usuario?.usuario_id;
+  if (ownerId !== propietarioId) {
+    throw new Error('No autorizado');
+  }
+
+  
+  item.estado = estado;
+  const saved = await repo.save(item);
+
+  return {
+    id: saved.id,
+    fecha: saved.fecha,
+    categoria: saved.categoria,
+    titulo: saved.titulo,
+    descripcion: saved.descripcion,
+    estado: saved.estado,
+    ubicacion_clinica_lat: saved.ubicacion_clinica_lat,
+    ubicacion_clinica_lon: saved.ubicacion_clinica_lon,
+    mascota: {
+      mascota_id: item.mascota.mascota_id,
+      nombre: item.mascota.nombre,
+      descripcion: item.mascota.descripcion,
+      fecha_nacimiento: item.mascota.fecha_nacimiento,
+      especie: item.mascota.especie,
+    },
+  };
 }
