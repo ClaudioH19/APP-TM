@@ -28,6 +28,7 @@ export class MascotaController {
             return res.status(201).json({
                 message: 'Mascota registrada correctamente',
                 mascota: {
+                    mascota_id: mascota.mascota_id,
                     nombre: mascota.nombre,
                     especie: mascota.especie,
                     fecha_nacimiento: mascota.fecha_nacimiento,

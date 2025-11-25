@@ -509,7 +509,7 @@ const MapComponent = () => {
             <Text style={twrnc`text-xl font-bold mb-4 text-center`}>¿Con quién vas a pasear?</Text>
             <FlatList
               data={myPets}
-              keyExtractor={(item) => item.mascota_id.toString()}
+              keyExtractor={(item, index) => item.mascota_id?.toString() || index.toString()}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={twrnc`flex-row items-center p-4 border-b border-gray-100`}

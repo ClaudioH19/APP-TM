@@ -525,7 +525,7 @@ const Perfil = () => {
     <View style={twrnc`flex-1 bg-white`}>
       <FlatList
         data={activeTab === 'pets' ? pets : posts}
-        keyExtractor={(item) => activeTab === 'pets' ? item.mascota_id.toString() : item.id.toString()}
+        keyExtractor={(item, index) => activeTab === 'pets' ? (item.mascota_id?.toString() || index.toString()) : (item.id?.toString() || index.toString())}
         numColumns={activeTab === 'grid' ? 3 : 1}
         key={activeTab} // Importante para forzar re-render al cambiar de tab
         columnWrapperStyle={activeTab === 'grid' ? { justifyContent: 'flex-start' } : null}
