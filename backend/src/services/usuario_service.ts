@@ -40,9 +40,5 @@ export async function getPetsByUserId(userId: number): Promise<Mascota[]> {
     where: { usuario: user },
   });
   
-  if (!mascotas || mascotas.length === 0) {
-    throw new Error("No hay mascotas para este usuario");
-  }
-  
-  return mascotas;
+  return mascotas || [];
 }
