@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator, Text, TouchableOpacity, Modal, FlatList } from 'react-native';
+import { View, StyleSheet, Alert, ActivityIndicator, Text, TouchableOpacity, Modal, FlatList, Platform, Linking } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Pedometer } from 'expo-sensors';
@@ -58,6 +58,21 @@ const MapComponent = () => {
   const [showPetSelectionModal, setShowPetSelectionModal] = useState(false);
   const [myPets, setMyPets] = useState([]);
   const [selectedPet, setSelectedPet] = useState(null);
+  const [usingPedometer, setUsingPedometer] = useState(false);
+
+  // Función auxiliar para calcular distancia entre dos coordenadas (Haversine formula)
+  const getDistanceFromLatLonInMeters = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // Radio de la tierra en metros
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    const d = R * c;
+    return d;
+  };
 
   useEffect(() => {
     getUserLocation();
@@ -97,10 +112,15 @@ const MapComponent = () => {
       }
 
       const isPedometerAvailable = await Pedometer.isAvailableAsync();
-      if (!isPedometerAvailable) {
-        Alert.alert('Error', 'El podómetro no está disponible en este dispositivo.');
-        // Podríamos continuar sin pasos, pero por ahora retornamos
-        // return; 
+      let finalPedometerStatus = 'undetermined';
+
+      if (isPedometerAvailable) {
+        const { status: pedometerStatus } = await Pedometer.requestPermissionsAsync();
+        finalPedometerStatus = pedometerStatus;
+        
+        // Alerta eliminada a petición del usuario
+      } else {
+        console.log('Podómetro no disponible en este dispositivo');
       }
 
       setIsTracking(true);
@@ -108,11 +128,21 @@ const MapComponent = () => {
       setCurrentStepCount(0);
       setSelectedPet(pet);
       setShowPetSelectionModal(false);
+      setUsingPedometer(false);
 
-      // Iniciar podómetro
-      if (isPedometerAvailable) {
+      // Iniciar podómetro solo si está disponible y autorizado
+      if (isPedometerAvailable && finalPedometerStatus === 'granted') {
+        setUsingPedometer(true);
+        let initialSteps = null;
         const sub = Pedometer.watchStepCount(result => {
-          setCurrentStepCount(result.steps);
+          if (Platform.OS === 'android') {
+            if (initialSteps === null) {
+              initialSteps = result.steps;
+            }
+            setCurrentStepCount(result.steps - initialSteps);
+          } else {
+            setCurrentStepCount(result.steps);
+          }
         });
         setSubscription(sub);
       }
@@ -126,7 +156,27 @@ const MapComponent = () => {
         },
         (location) => {
           const { latitude, longitude } = location.coords;
-          setRouteCoordinates(prev => [...prev, { latitude, longitude, timestamp: new Date() }]);
+          
+          setRouteCoordinates(prev => {
+            const newCoords = [...prev, { latitude, longitude, timestamp: new Date() }];
+            
+            // Si no usamos podómetro, estimar pasos basados en distancia
+            // Promedio de longitud de paso ~0.762 metros
+            if (!usingPedometer && prev.length > 0) {
+              const lastPoint = prev[prev.length - 1];
+              const dist = getDistanceFromLatLonInMeters(
+                lastPoint.latitude, lastPoint.longitude,
+                latitude, longitude
+              );
+              // Acumular pasos estimados (distancia / 0.762)
+              const stepsToAdd = Math.round(dist / 0.762);
+              if (stepsToAdd > 0) {
+                setCurrentStepCount(c => c + stepsToAdd);
+              }
+            }
+            
+            return newCoords;
+          });
           
           // Centrar mapa en la nueva ubicación
           if (mapRef.current) {
@@ -419,7 +469,7 @@ const MapComponent = () => {
               <Footprints size={20} color="#3b82f6" />
               <Text style={twrnc`text-2xl font-bold ml-2 text-blue-600`}>{currentStepCount}</Text>
             </View>
-            <Text style={twrnc`text-xs text-gray-500`}>pasos</Text>
+            <Text style={twrnc`text-xs text-gray-500`}>{usingPedometer ? 'pasos' : 'pasos (est.)'}</Text>
           </View>
           <TouchableOpacity
             style={twrnc`bg-red-500 p-3 rounded-full`}
