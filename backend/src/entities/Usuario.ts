@@ -27,6 +27,12 @@ export class Usuario {
   @Column({ type: 'text', nullable: false })
   email!: string;
 
+  @Column({ type: 'bytea', nullable: true })
+  avatar!: Buffer | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  avatar_mime_type!: string | null;
+
   // Relaciones
   @OneToMany(() => Mascota, (m: Mascota) => m.usuario)
   mascotas!: Mascota[];

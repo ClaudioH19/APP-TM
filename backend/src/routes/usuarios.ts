@@ -7,5 +7,6 @@ router.put('/', UsuarioController.updateUser);
 router.delete('/', UsuarioController.deleteUser);
 router.get('/pets', UsuarioController.getPets);
 router.post('/change-password', UsuarioController.changePassword);
+router.get('/avatar/:userId', UsuarioController.getAvatar);
 export default router;  
 

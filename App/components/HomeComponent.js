@@ -2,12 +2,11 @@ import React from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PostCard } from './PostCard';
-import { usePosts } from '../hooks/usePosts';
-import { API_ENDPOINTS } from '../config/api';
+import { useCachedPosts } from '../hooks/useCachedPosts';
 
 
 const HomeComponent = () => {
-  const { posts, loading, error, refreshPosts } = usePosts(API_ENDPOINTS.POSTS);
+  const { posts, loading, error, refreshing, refresh } = useCachedPosts();
 
   if (loading) {
     return (
@@ -24,7 +23,7 @@ const HomeComponent = () => {
         <Text className="text-center text-red-500 text-base">{error}</Text>
         <Pressable 
           className="mt-4 bg-[#5bbbe8] px-4 py-2 rounded-lg"
-          onPress={refreshPosts}
+          onPress={refresh}
         >
           <Text className="text-white">Reintentar</Text>
         </Pressable>
@@ -40,8 +39,8 @@ const HomeComponent = () => {
         contentContainerStyle={{ paddingBottom: 88 }}
         refreshControl={
           <RefreshControl
-            refreshing={loading}
-            onRefresh={refreshPosts}
+            refreshing={refreshing}
+            onRefresh={refresh}
             colors={['#5bbbe8']} // Android
             tintColor="#5bbbe8" // iOS
           />

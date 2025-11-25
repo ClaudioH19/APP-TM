@@ -7,8 +7,9 @@ import usuarioRouter from './usuarios';
 import commentRouter from './comment';
 import mascotasRouter from './mascota';
 import recorridoRouter from './recorrido';
-const router = Router();
+import perfilRouter from './perfil';
 
+const router = Router();
 
 router.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
@@ -25,7 +26,7 @@ router.use('/interest_points', interestPointRouter);
 // Rutas de reseñas
 router.use('/reviews', reviewRouter);
 router.use('/usuarios', usuarioRouter);
+router.use('/mascotas', mascotasRouter);
 router.use('/recorridos', recorridoRouter);
-
-
+router.use('/perfil', perfilRouter);
 export default router;

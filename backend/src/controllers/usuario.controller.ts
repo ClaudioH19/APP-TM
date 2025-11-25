@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { verifyToken, getUserFromToken } from '../services/token_service';
 import { getUserById,updateUser,deleteUser,getPetsByUserId,changePassword} from '../services/usuario_service';
+import { AppDataSource } from '../data-source';
+import { Usuario } from '../entities/Usuario';
+import crypto from 'crypto';
 
 export class UsuarioController {
   static async getUser(req: Request, res: Response) {
@@ -93,4 +96,43 @@ export class UsuarioController {
       return res.status(500).json({ message: "Error al cambiar la contraseña" });
     }
     }
+
+  static async getAvatar(req: Request, res: Response) {
+    try {
+      const userId = parseInt(req.params.userId);
+      if (isNaN(userId)) {
+        return res.status(400).json({ error: 'ID de usuario inválido' });
+      }
+
+      const usuarioRepo = AppDataSource.getRepository(Usuario);
+      const user = await usuarioRepo.findOne({ 
+        where: { usuario_id: userId },
+        select: ['usuario_id', 'avatar', 'avatar_mime_type']
+      });
+
+      if (!user || !user.avatar) {
+        return res.status(404).json({ error: 'Avatar no encontrado' });
+      }
+
+      // Generar ETag basado en hash del avatar
+      const hash = crypto.createHash('md5').update(user.avatar).digest('hex');
+      const etag = `"${hash}"`;
+
+      // Verificar If-None-Match header
+      const clientEtag = req.headers['if-none-match'];
+      if (clientEtag === etag) {
+        return res.status(304).send(); // Not Modified
+      }
+
+      // Establecer headers de caché
+      res.setHeader('Content-Type', user.avatar_mime_type || 'image/jpeg');
+      res.setHeader('ETag', etag);
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // 24 horas
+      
+      return res.send(user.avatar);
+    } catch (error: any) {
+      console.error('Error getting avatar:', error);
+      return res.status(500).json({ error: 'Error al obtener avatar' });
+    }
+  }
 }
