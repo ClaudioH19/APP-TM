@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, Index, Jo
 import { Usuario } from './Usuario';
 import { Mascota } from './Mascota';
 import { Comentario } from './Comentario';
+import { Interaccion } from './Interaccion';
 
 @Entity('publicacion')
 export class Publicacion {
@@ -48,6 +49,9 @@ export class Publicacion {
   @Index('idx_pub_mascota')
   @JoinColumn({ name: 'mascota_id' })
   mascota!: Mascota | null;
+
+  @OneToMany(() => Interaccion, (interaccion) => interaccion.publicacion)
+  interacciones!: Interaccion[];
 
   @OneToMany(() => Comentario, (c: Comentario) => c.publicacion)
   comentarios!: Comentario[];

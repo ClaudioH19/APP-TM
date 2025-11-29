@@ -9,7 +9,7 @@ export class Interaccion {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @ManyToOne(() => Publicacion, { nullable: false, onDelete: 'CASCADE' })
+  @ManyToOne(() => Publicacion, (p) => p.interacciones, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'publicacion_id' })
   publicacion!: Publicacion;
 

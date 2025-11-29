@@ -31,8 +31,9 @@ const DefaultAvatar = () => (
 
 export const PostCard = ({ post }) => {
   // Estados para las interacciones
-  const [liked, setLiked] = useState(false);
-  const [commented, setCommented] = useState(false);
+  // Inicializar directamente con los datos optimizados del backend
+  const [liked, setLiked] = useState(post.hasLiked || false);
+  const [commented, setCommented] = useState(post.hasCommented || false);
   
   // Estados para los contadores
   const [likeCount, setLikeCount] = useState(post.contador_likes ?? 0);
@@ -51,27 +52,28 @@ export const PostCard = ({ post }) => {
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [avatarError, setAvatarError] = useState(false);
 
-  // Función para cargar las interacciones del usuario
-  const loadUserInteractions = async () => {
-    setLoadingInteractions(true);
+  // Función para actualizar el contador de comentarios desde el backend
+  // Se mantiene para actualizar después de comentar en el modal
+  const refreshCommentCount = async () => {
     try {
-      const interactions = await getUserInteractions(post.id);
-      setLiked(interactions.hasLiked);
-      setCommented(interactions.hasCommented);
+      const response = await fetch(`${API_ENDPOINTS.COMMENTS}?publicacion_id=${post.id}`);
+      if (response.ok) {
+        const comments = await response.json();
+        setCommentCount(comments.length);
+        setCommented(comments.length > 0);
+      }
     } catch (error) {
-      console.error('Error cargando interacciones:', error);
-    } finally {
-      setLoadingInteractions(false);
+      console.error('Error al actualizar contador de comentarios:', error);
     }
   };
+
   const [commentsVisible, setCommentsVisible] = useState(false);
   const openComments = () => setCommentsVisible(true);
   const closeComments = () => setCommentsVisible(false);
 
-  // Cargar interacciones al montar el componente
+  // Cargar avatar al montar el componente
   useEffect(() => {
-    loadUserInteractions();
-    refreshCommentCount(); // Cargar el contador real de comentarios
+    // Ya NO cargamos interacciones aquí (optimización masiva)
     
     // Cargar avatar si existe el usuario
     if (post.usuario?.usuario_id) {
@@ -116,19 +118,7 @@ export const PostCard = ({ post }) => {
     }
   };
 
-  // Función para actualizar el contador de comentarios desde el backend
-  const refreshCommentCount = async () => {
-    try {
-      const response = await fetch(`${API_ENDPOINTS.COMMENTS}?publicacion_id=${post.id}`);
-      if (response.ok) {
-        const comments = await response.json();
-        setCommentCount(comments.length);
-        setCommented(comments.length > 0);
-      }
-    } catch (error) {
-      console.error('Error al actualizar contador de comentarios:', error);
-    }
-  };
+
   
 
 

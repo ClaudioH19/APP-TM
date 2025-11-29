@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { API_ENDPOINTS } from '../config/api';
 import { postCache } from '../services/postCache';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export function useCachedPosts(filterByUserId = null) {
   const [posts, setPosts] = useState([]);
@@ -32,7 +33,15 @@ export function useCachedPosts(filterByUserId = null) {
       setError(null);
 
       console.log('🌐 Fetching posts from API...');
-      const response = await fetch(API_ENDPOINTS.POSTS);
+      
+      // Obtener token para que el backend sepa quién somos (y nos diga si dimos like)
+      const token = await AsyncStorage.getItem('token');
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(API_ENDPOINTS.POSTS, { headers });
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: Error al obtener publicaciones`);
@@ -40,29 +49,14 @@ export function useCachedPosts(filterByUserId = null) {
 
       const data = await response.json();
 
-      // Enriquecer con nombre de ubicación
-      const enriched = await Promise.all(data.map(async post => {
-        if (post.ubicacion_lat && post.ubicacion_lon) {
-          try {
-            const ubicacion = await fetch(`${API_ENDPOINTS.LOCATION}?lat=${post.ubicacion_lat}&lon=${post.ubicacion_lon}`)
-              .then(res => res.json())
-              .then(data => data.name)
-              .catch(() => null);
-            return { ...post, ubicacion };
-          } catch (err) {
-            return post;
-          }
-        }
-        return post;
-      }));
-
-      // Guardar en caché
-      postCache.setPosts(enriched);
+      // Guardar en caché directamente (sin enriquecimiento lento de ubicación)
+      // La ubicación se cargará bajo demanda si es necesario, o el backend debería enviarla
+      postCache.setPosts(data);
 
       // Filtrar si es necesario
       const filtered = filterByUserId 
-        ? enriched.filter(post => post.usuario?.usuario_id === filterByUserId)
-        : enriched;
+        ? data.filter(post => post.usuario?.usuario_id === filterByUserId)
+        : data;
 
       setPosts(filtered);
     } catch (err) {

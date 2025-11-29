@@ -16,52 +16,63 @@ interface MulterRequest extends Request {
 export class PublicationController {
     static async getPublications(req: Request, res: Response) {
         try {
-            console.log('Fetching all publications from the database...'); // Debug log
+            console.log('Fetching all publications (optimized)...');
             const dataSource = req.app.get('dataSource');
             const publicationRepo = dataSource.getRepository(Publicacion);
             const interaccionRepo = dataSource.getRepository(Interaccion);
             
-            // Obtener todas las publicaciones ordenadas por fecha
-            const publications = await publicationRepo.find({
-                order: { fecha: 'DESC' },
-                relations: ['usuario', 'mascota'],
-            });
+            // 1. Obtener ID del usuario actual si hay token
+            const token = req.headers.authorization?.split(' ')[1];
+            let userId = null;
+            if (token) {
+                try {
+                    const user = await getUserFromToken(token);
+                    if (user) userId = user.usuario_id;
+                } catch (e) {
+                    // Token inválido o expirado, tratamos como invitado
+                }
+            }
 
-            // Para cada publicación, calcular los contadores de interacciones
-            const publicationsWithCounts = await Promise.all(
-                publications.map(async (publication: Publicacion) => {
-                    const [likeCount, commentCount, shareCount] = await Promise.all([
-                        interaccionRepo.count({
-                            where: { 
-                                publicacion: { id: publication.id }, 
-                                interaccion_tipo: 1 
-                            }
-                        }),
-                        interaccionRepo.count({
-                            where: { 
-                                publicacion: { id: publication.id }, 
-                                interaccion_tipo: 2 
-                            }
-                        }),
-                        interaccionRepo.count({
-                            where: { 
-                                publicacion: { id: publication.id }, 
-                                interaccion_tipo: 3 
-                            }
-                        })
-                    ]);
+            // 2. Query principal: Posts + Relaciones + Contadores
+            const qb = publicationRepo.createQueryBuilder('publicacion')
+                .leftJoinAndSelect('publicacion.usuario', 'usuario')
+                .leftJoinAndSelect('publicacion.mascota', 'mascota')
+                .orderBy('publicacion.fecha', 'DESC');
 
-                    return {
-                        ...publication,
-                        contador_likes: likeCount,
-                        contador_comentarios: commentCount,
-                        contador_compartidos: shareCount
-                    };
-                })
-            );
+            // Mapear contadores directamente en el objeto
+            qb.loadRelationCountAndMap('publicacion.contador_likes', 'publicacion.interacciones', 'likes', (qb) => qb.where('likes.interaccion_tipo = :likeType', { likeType: 1 }));
+            qb.loadRelationCountAndMap('publicacion.contador_comentarios', 'publicacion.interacciones', 'comments', (qb) => qb.where('comments.interaccion_tipo = :commentType', { commentType: 2 }));
+            qb.loadRelationCountAndMap('publicacion.contador_compartidos', 'publicacion.interacciones', 'shares', (qb) => qb.where('shares.interaccion_tipo = :shareType', { shareType: 3 }));
 
-            console.log('Publications fetched with interaction counts:', publicationsWithCounts.length);
-            res.json(publicationsWithCounts);
+            const publications = await qb.getMany();
+
+            // 3. Si hay usuario, obtener qué posts ha likeado/comentado en una sola consulta
+            let likedPostIds = new Set();
+            let commentedPostIds = new Set();
+            
+            if (userId) {
+                const interactions = await interaccionRepo.createQueryBuilder('interaccion')
+                    .select('interaccion.publicacion_id', 'publicacionId')
+                    .addSelect('interaccion.interaccion_tipo', 'tipo')
+                    .where('interaccion.usuario_id = :userId', { userId })
+                    .andWhere('interaccion.interaccion_tipo IN (:...types)', { types: [1, 2] })
+                    .getRawMany();
+                
+                interactions.forEach(i => {
+                    if (i.tipo === 1) likedPostIds.add(i.publicacionId);
+                    if (i.tipo === 2) commentedPostIds.add(i.publicacionId);
+                });
+            }
+
+            // 4. Combinar resultados
+            const result = publications.map(p => ({
+                ...p,
+                hasLiked: likedPostIds.has(p.id),
+                hasCommented: commentedPostIds.has(p.id)
+            }));
+
+            console.log(`Fetched ${result.length} publications. User ${userId ? 'authenticated' : 'guest'}.`);
+            res.json(result);
         } catch (error) {
             console.error('Error fetching publications:', error);
             res.status(500).json({ message: 'Error fetching publications' });

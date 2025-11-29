@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, FlatList, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PostCard } from './PostCard';
 import { useCachedPosts } from '../hooks/useCachedPosts';
@@ -34,7 +34,14 @@ const HomeComponent = () => {
   return (
     <View className="max-w-md self-center w-full flex-1">
       {/* Feed */}
-      <ScrollView 
+      <FlatList 
+        data={posts}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => (
+          <View className="pb-3">
+            <PostCard post={item} />
+          </View>
+        )}
         className="bg-white mt-2" 
         contentContainerStyle={{ paddingBottom: 88 }}
         refreshControl={
@@ -45,13 +52,11 @@ const HomeComponent = () => {
             tintColor="#5bbbe8" // iOS
           />
         }
-      >
-        {posts.map((p) => (
-          <View key={p.id} className="pb-3">
-            <PostCard post={p} />
-          </View>
-        ))}
-      </ScrollView>
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
+        windowSize={5}
+        removeClippedSubviews={true}
+      />
     </View>
   );
 };

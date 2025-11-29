@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Alert, ActivityIndicator, Text, TouchableOpacity, Modal, FlatList, Platform, Linking } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { Pedometer } from 'expo-sensors';
+import { Pedometer, Accelerometer } from 'expo-sensors';
 import { MapPin, X, Check, Play, Square, Footprints } from 'lucide-react-native';
 import CustomMarker from './CustomMarker';
 import CreatePointModal from './CreatePointModal';
@@ -33,6 +33,8 @@ const mapStyle = [
 
 const MapComponent = () => {
   const mapRef = useRef(null);
+  const lastStepTime = useRef(0); // Para el acelerómetro
+  const usingPedometerRef = useRef(false); // Ref para evitar problemas de clausura en callbacks
   const [region, setRegion] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -53,8 +55,11 @@ const MapComponent = () => {
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [currentStepCount, setCurrentStepCount] = useState(0);
   const [initialStepCount, setInitialStepCount] = useState(0);
-  const [subscription, setSubscription] = useState(null);
-  const [locationSubscription, setLocationSubscription] = useState(null);
+  
+  // Refs para suscripciones (para limpieza segura al desmontar)
+  const subscriptionRef = useRef(null);
+  const locationSubscriptionRef = useRef(null);
+  
   const [showPetSelectionModal, setShowPetSelectionModal] = useState(false);
   const [myPets, setMyPets] = useState([]);
   const [selectedPet, setSelectedPet] = useState(null);
@@ -78,10 +83,55 @@ const MapComponent = () => {
     getUserLocation();
     loadInterestPoints();
     fetchMyPets();
+    
+    // Limpieza robusta al desmontar
     return () => {
-      stopTracking(); // Limpiar al desmontar
+      console.log('🧹 Limpiando recursos del mapa...');
+      
+      // 1. Limpiar suscripción de podómetro/acelerómetro
+      if (subscriptionRef.current) {
+        try {
+          subscriptionRef.current.remove();
+        } catch (e) { console.log('Error limpiando sub:', e); }
+        subscriptionRef.current = null;
+      }
+
+      // 2. Limpiar suscripción de ubicación
+      if (locationSubscriptionRef.current) {
+        try {
+          locationSubscriptionRef.current.remove();
+        } catch (e) { console.log('Error limpiando loc:', e); }
+        locationSubscriptionRef.current = null;
+      }
+
+      // 3. Detener TODOS los listeners globales de sensores por si acaso
+      try {
+        Accelerometer.removeAllListeners();
+        Pedometer.removeAllListeners?.(); // Pedometer a veces no tiene este método en todas las versiones
+      } catch (e) {}
     };
   }, []);
+
+  // Efecto adicional para limpiar cuando la pantalla pierde el foco (Tab Navigation)
+  useEffect(() => {
+    if (!isFocused) {
+      console.log('💤 Mapa perdió foco -> Pausando sensores no esenciales');
+      // Opcional: Podríamos pausar el rastreo aquí si quisiéramos ahorrar batería
+      // Pero si queremos rastreo en background, NO debemos limpiar aquí.
+      // Solo limpiamos si el usuario NO está rastreando activamente.
+      if (!isTracking) {
+         if (locationSubscriptionRef.current) {
+            locationSubscriptionRef.current.remove();
+            locationSubscriptionRef.current = null;
+         }
+      }
+    } else {
+       // Al volver al foco, si no estamos rastreando, podríamos querer actualizar ubicación una vez
+       if (!isTracking && !locationSubscriptionRef.current) {
+          getUserLocation();
+       }
+    }
+  }, [isFocused, isTracking]);
 
   const fetchMyPets = async () => {
     try {
@@ -103,6 +153,46 @@ const MapComponent = () => {
     }
   };
 
+  // Función de respaldo usando el acelerómetro
+  const startAccelerometer = async () => {
+    try {
+      const isAvailable = await Accelerometer.isAvailableAsync();
+      if (!isAvailable) {
+        console.log('❌ Acelerómetro no disponible en hardware');
+        return;
+      }
+
+      console.log('🚀 Iniciando acelerómetro como fallback...');
+      setUsingPedometer(true); 
+      usingPedometerRef.current = true;
+      
+      Accelerometer.setUpdateInterval(100); // 10Hz
+      
+      // Variables para suavizado (filtro paso bajo)
+      let lastMag = 0;
+      const alpha = 0.8; // Factor de suavizado
+
+      const sub = Accelerometer.addListener(({ x, y, z }) => {
+        const rawMag = Math.sqrt(x * x + y * y + z * z);
+        // Filtro simple: Mag_suave = alpha * Mag_suave_prev + (1 - alpha) * Mag_raw
+        const magnitude = alpha * lastMag + (1 - alpha) * rawMag;
+        lastMag = magnitude;
+
+        const now = Date.now();
+        
+        // Umbral restaurado: 1.2G y debounce de 350ms
+        if (magnitude > 1.2 && now - lastStepTime.current > 350) {
+          setCurrentStepCount(prev => prev + 1);
+          lastStepTime.current = now;
+        }
+      });
+      subscriptionRef.current = sub;
+    } catch (error) {
+      console.error('Error iniciando acelerómetro:', error);
+      Alert.alert('Error', 'No se pudo iniciar el sensor de movimiento.');
+    }
+  };
+
   const startTracking = async (pet) => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -111,16 +201,24 @@ const MapComponent = () => {
         return;
       }
 
-      const isPedometerAvailable = await Pedometer.isAvailableAsync();
-      let finalPedometerStatus = 'undetermined';
-
-      if (isPedometerAvailable) {
-        const { status: pedometerStatus } = await Pedometer.requestPermissionsAsync();
-        finalPedometerStatus = pedometerStatus;
-        
-        // Alerta eliminada a petición del usuario
-      } else {
-        console.log('Podómetro no disponible en este dispositivo');
+      let usePedometer = false;
+      try {
+        const isPedometerAvailable = await Pedometer.isAvailableAsync();
+        if (isPedometerAvailable) {
+          const { status: pedometerStatus } = await Pedometer.getPermissionsAsync();
+          
+          if (pedometerStatus === 'granted') {
+            usePedometer = true;
+          } else {
+            const { status: newStatus } = await Pedometer.requestPermissionsAsync();
+            if (newStatus === 'granted') {
+              usePedometer = true;
+            }
+          }
+        }
+      } catch (e) {
+        console.log('Error verificando podómetro:', e);
+        // Si falla la verificación, asumimos que no se puede usar y seguimos con acelerómetro
       }
 
       setIsTracking(true);
@@ -129,22 +227,26 @@ const MapComponent = () => {
       setSelectedPet(pet);
       setShowPetSelectionModal(false);
       setUsingPedometer(false);
+      usingPedometerRef.current = false;
 
-      // Iniciar podómetro solo si está disponible y autorizado
-      if (isPedometerAvailable && finalPedometerStatus === 'granted') {
+      if (usePedometer) {
+        console.log('✅ Usando Pedometer nativo');
         setUsingPedometer(true);
+        usingPedometerRef.current = true;
         let initialSteps = null;
         const sub = Pedometer.watchStepCount(result => {
           if (Platform.OS === 'android') {
-            if (initialSteps === null) {
-              initialSteps = result.steps;
-            }
+            if (initialSteps === null) initialSteps = result.steps;
             setCurrentStepCount(result.steps - initialSteps);
           } else {
             setCurrentStepCount(result.steps);
           }
         });
-        setSubscription(sub);
+        subscriptionRef.current = sub;
+      } else {
+        // Si no hay podómetro o permiso, usamos acelerómetro
+        console.log('⚠️ Pedometer no disponible/denegado -> Usando Acelerómetro');
+        await startAccelerometer();
       }
 
       // Iniciar rastreo de ubicación
@@ -160,9 +262,9 @@ const MapComponent = () => {
           setRouteCoordinates(prev => {
             const newCoords = [...prev, { latitude, longitude, timestamp: new Date() }];
             
-            // Si no usamos podómetro, estimar pasos basados en distancia
-            // Promedio de longitud de paso ~0.762 metros
-            if (!usingPedometer && prev.length > 0) {
+            // Si no usamos podómetro (ni nativo ni acelerómetro), estimar pasos basados en distancia
+            // Usamos usingPedometerRef para asegurar el valor actual dentro del callback
+            if (!usingPedometerRef.current && prev.length > 0) {
               const lastPoint = prev[prev.length - 1];
               const dist = getDistanceFromLatLonInMeters(
                 lastPoint.latitude, lastPoint.longitude,
@@ -189,7 +291,7 @@ const MapComponent = () => {
           }
         }
       );
-      setLocationSubscription(locSub);
+      locationSubscriptionRef.current = locSub;
 
     } catch (error) {
       console.error('Error starting tracking:', error);
@@ -199,17 +301,20 @@ const MapComponent = () => {
   };
 
   const stopTracking = async () => {
-    if (!isTracking) return;
+    // Detener suscripciones siempre, independientemente del estado isTracking
+    if (subscriptionRef.current) {
+      subscriptionRef.current.remove();
+      subscriptionRef.current = null;
+    }
+    if (locationSubscriptionRef.current) {
+      locationSubscriptionRef.current.remove();
+      locationSubscriptionRef.current = null;
+    }
+    
+    // Detener acelerómetro explícitamente
+    Accelerometer.removeAllListeners();
 
-    // Detener suscripciones
-    if (subscription) {
-      subscription.remove();
-      setSubscription(null);
-    }
-    if (locationSubscription) {
-      locationSubscription.remove();
-      setLocationSubscription(null);
-    }
+    if (!isTracking) return;
 
     setIsTracking(false);
 
