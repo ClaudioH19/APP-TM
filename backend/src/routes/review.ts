@@ -8,6 +8,6 @@ const router = Router();
 // POST /api/reviews
 router.post('/', authMiddleware, ReviewController.createReview);
 // GET /api/reviews/:id
-router.get('/:id', ReviewController.getReviewsForPoint);
+router.get('/:id',authMiddleware ,ReviewController.getReviewsForPoint);
 
 export default router;
