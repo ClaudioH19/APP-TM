@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
-import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
+import { View, StyleSheet, Alert, ActivityIndicator, Text, TouchableOpacity, Modal, FlatList, Platform, Linking } from 'react-native';
+import MapView, { PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { MapPin, X, Check } from 'lucide-react-native';
+import { Pedometer, Accelerometer } from 'expo-sensors';
+import { MapPin, X, Check, Play, Square, Footprints } from 'lucide-react-native';
 import CustomMarker from './CustomMarker';
 import CreatePointModal from './CreatePointModal';
 import PointDetailModal from './PointDetailModal';
 import { getInterestPoints, formatPointsForMap, createInterestPoint } from '../services/interestPointsService';
 import { useIsFocused } from '@react-navigation/native';
+import { API_ENDPOINTS } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import twrnc from 'twrnc';
 
 
 const mapStyle = [
@@ -29,6 +33,8 @@ const mapStyle = [
 
 const MapComponent = () => {
   const mapRef = useRef(null);
+  const lastStepTime = useRef(0); // Para el acelerómetro
+  const usingPedometerRef = useRef(false); // Ref para evitar problemas de clausura en callbacks
   const [region, setRegion] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,10 +50,329 @@ const MapComponent = () => {
   const [selectedPoint, setSelectedPoint] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
+  // Estados para el recorrido
+  const [isTracking, setIsTracking] = useState(false);
+  const [routeCoordinates, setRouteCoordinates] = useState([]);
+  const [currentStepCount, setCurrentStepCount] = useState(0);
+  const [initialStepCount, setInitialStepCount] = useState(0);
+  
+  // Refs para suscripciones (para limpieza segura al desmontar)
+  const subscriptionRef = useRef(null);
+  const locationSubscriptionRef = useRef(null);
+  
+  const [showPetSelectionModal, setShowPetSelectionModal] = useState(false);
+  const [myPets, setMyPets] = useState([]);
+  const [selectedPet, setSelectedPet] = useState(null);
+  const [usingPedometer, setUsingPedometer] = useState(false);
+
+  // Función auxiliar para calcular distancia entre dos coordenadas (Haversine formula)
+  const getDistanceFromLatLonInMeters = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // Radio de la tierra en metros
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    const d = R * c;
+    return d;
+  };
+
   useEffect(() => {
     getUserLocation();
     loadInterestPoints();
+    fetchMyPets();
+    
+    // Limpieza robusta al desmontar
+    return () => {
+      console.log('🧹 Limpiando recursos del mapa...');
+      
+      // 1. Limpiar suscripción de podómetro/acelerómetro
+      if (subscriptionRef.current) {
+        try {
+          subscriptionRef.current.remove();
+        } catch (e) { console.log('Error limpiando sub:', e); }
+        subscriptionRef.current = null;
+      }
+
+      // 2. Limpiar suscripción de ubicación
+      if (locationSubscriptionRef.current) {
+        try {
+          locationSubscriptionRef.current.remove();
+        } catch (e) { console.log('Error limpiando loc:', e); }
+        locationSubscriptionRef.current = null;
+      }
+
+      // 3. Detener TODOS los listeners globales de sensores por si acaso
+      try {
+        Accelerometer.removeAllListeners();
+        Pedometer.removeAllListeners?.(); // Pedometer a veces no tiene este método en todas las versiones
+      } catch (e) {}
+    };
   }, []);
+
+  // Efecto adicional para limpiar cuando la pantalla pierde el foco (Tab Navigation)
+  useEffect(() => {
+    if (!isFocused) {
+      console.log('💤 Mapa perdió foco -> Pausando sensores no esenciales');
+      // Opcional: Podríamos pausar el rastreo aquí si quisiéramos ahorrar batería
+      // Pero si queremos rastreo en background, NO debemos limpiar aquí.
+      // Solo limpiamos si el usuario NO está rastreando activamente.
+      if (!isTracking) {
+         if (locationSubscriptionRef.current) {
+            locationSubscriptionRef.current.remove();
+            locationSubscriptionRef.current = null;
+         }
+      }
+    } else {
+       // Al volver al foco, si no estamos rastreando, podríamos querer actualizar ubicación una vez
+       if (!isTracking && !locationSubscriptionRef.current) {
+          getUserLocation();
+       }
+    }
+  }, [isFocused, isTracking]);
+
+  const fetchMyPets = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
+      
+      const response = await fetch(API_ENDPOINTS.PROFILE_PETS, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // El backend devuelve un array directamente o un objeto con la propiedad mascotas
+        const pets = Array.isArray(data) ? data : (data.mascotas || []);
+        setMyPets(pets);
+      }
+    } catch (error) {
+      console.error('Error fetching pets:', error);
+    }
+  };
+
+  // Función de respaldo usando el acelerómetro
+  const startAccelerometer = async () => {
+    try {
+      const isAvailable = await Accelerometer.isAvailableAsync();
+      if (!isAvailable) {
+        console.log('❌ Acelerómetro no disponible en hardware');
+        return;
+      }
+
+      console.log('🚀 Iniciando acelerómetro como fallback...');
+      setUsingPedometer(true); 
+      usingPedometerRef.current = true;
+      
+      Accelerometer.setUpdateInterval(100); // 10Hz
+      
+      // Variables para suavizado (filtro paso bajo)
+      let lastMag = 0;
+      const alpha = 0.8; // Factor de suavizado
+
+      const sub = Accelerometer.addListener(({ x, y, z }) => {
+        const rawMag = Math.sqrt(x * x + y * y + z * z);
+        // Filtro simple: Mag_suave = alpha * Mag_suave_prev + (1 - alpha) * Mag_raw
+        const magnitude = alpha * lastMag + (1 - alpha) * rawMag;
+        lastMag = magnitude;
+
+        const now = Date.now();
+        
+        // Umbral restaurado: 1.2G y debounce de 350ms
+        if (magnitude > 1.2 && now - lastStepTime.current > 350) {
+          setCurrentStepCount(prev => prev + 1);
+          lastStepTime.current = now;
+        }
+      });
+      subscriptionRef.current = sub;
+    } catch (error) {
+      console.error('Error iniciando acelerómetro:', error);
+      Alert.alert('Error', 'No se pudo iniciar el sensor de movimiento.');
+    }
+  };
+
+  const startTracking = async (pet) => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso denegado', 'Se requiere permiso de ubicación para rastrear la ruta.');
+        return;
+      }
+
+      let usePedometer = false;
+      try {
+        const isPedometerAvailable = await Pedometer.isAvailableAsync();
+        if (isPedometerAvailable) {
+          const { status: pedometerStatus } = await Pedometer.getPermissionsAsync();
+          
+          if (pedometerStatus === 'granted') {
+            usePedometer = true;
+          } else {
+            const { status: newStatus } = await Pedometer.requestPermissionsAsync();
+            if (newStatus === 'granted') {
+              usePedometer = true;
+            }
+          }
+        }
+      } catch (e) {
+        console.log('Error verificando podómetro:', e);
+        // Si falla la verificación, asumimos que no se puede usar y seguimos con acelerómetro
+      }
+
+      setIsTracking(true);
+      setRouteCoordinates([]);
+      setCurrentStepCount(0);
+      setSelectedPet(pet);
+      setShowPetSelectionModal(false);
+      setUsingPedometer(false);
+      usingPedometerRef.current = false;
+
+      if (usePedometer) {
+        console.log('✅ Usando Pedometer nativo');
+        setUsingPedometer(true);
+        usingPedometerRef.current = true;
+        let initialSteps = null;
+        const sub = Pedometer.watchStepCount(result => {
+          if (Platform.OS === 'android') {
+            if (initialSteps === null) initialSteps = result.steps;
+            setCurrentStepCount(result.steps - initialSteps);
+          } else {
+            setCurrentStepCount(result.steps);
+          }
+        });
+        subscriptionRef.current = sub;
+      } else {
+        // Si no hay podómetro o permiso, usamos acelerómetro
+        console.log('⚠️ Pedometer no disponible/denegado -> Usando Acelerómetro');
+        await startAccelerometer();
+      }
+
+      // Iniciar rastreo de ubicación
+      const locSub = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 5000, // cada 5 segundos
+          distanceInterval: 5, // cada 5 metros
+        },
+        (location) => {
+          const { latitude, longitude } = location.coords;
+          
+          setRouteCoordinates(prev => {
+            const newCoords = [...prev, { latitude, longitude, timestamp: new Date() }];
+            
+            // Si no usamos podómetro (ni nativo ni acelerómetro), estimar pasos basados en distancia
+            // Usamos usingPedometerRef para asegurar el valor actual dentro del callback
+            if (!usingPedometerRef.current && prev.length > 0) {
+              const lastPoint = prev[prev.length - 1];
+              const dist = getDistanceFromLatLonInMeters(
+                lastPoint.latitude, lastPoint.longitude,
+                latitude, longitude
+              );
+              // Acumular pasos estimados (distancia / 0.762)
+              const stepsToAdd = Math.round(dist / 0.762);
+              if (stepsToAdd > 0) {
+                setCurrentStepCount(c => c + stepsToAdd);
+              }
+            }
+            
+            return newCoords;
+          });
+          
+          // Centrar mapa en la nueva ubicación
+          if (mapRef.current) {
+            mapRef.current.animateToRegion({
+              latitude,
+              longitude,
+              latitudeDelta: 0.005,
+              longitudeDelta: 0.005,
+            }, 500);
+          }
+        }
+      );
+      locationSubscriptionRef.current = locSub;
+
+    } catch (error) {
+      console.error('Error starting tracking:', error);
+      Alert.alert('Error', 'No se pudo iniciar el recorrido.');
+      setIsTracking(false);
+    }
+  };
+
+  const stopTracking = async () => {
+    // Detener suscripciones siempre, independientemente del estado isTracking
+    if (subscriptionRef.current) {
+      subscriptionRef.current.remove();
+      subscriptionRef.current = null;
+    }
+    if (locationSubscriptionRef.current) {
+      locationSubscriptionRef.current.remove();
+      locationSubscriptionRef.current = null;
+    }
+    
+    // Detener acelerómetro explícitamente
+    Accelerometer.removeAllListeners();
+
+    if (!isTracking) return;
+
+    setIsTracking(false);
+
+    if (routeCoordinates.length > 0 && selectedPet) {
+      // Guardar recorrido
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) return;
+
+        const puntos = routeCoordinates.map(coord => ({
+          latitud: coord.latitude,
+          longitud: coord.longitude,
+          timestamp: coord.timestamp
+        }));
+
+        const response = await fetch(API_ENDPOINTS.RECORRIDOS, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            mascotaId: selectedPet.mascota_id,
+            pasos: currentStepCount,
+            puntos
+          })
+        });
+
+        if (response.ok) {
+          Alert.alert('¡Recorrido finalizado!', `Has dado ${currentStepCount} pasos con ${selectedPet.nombre}.`);
+        } else {
+          Alert.alert('Error', 'No se pudo guardar el recorrido.');
+        }
+      } catch (error) {
+        console.error('Error saving route:', error);
+        Alert.alert('Error', 'Error de conexión al guardar el recorrido.');
+      }
+    } else {
+        if(isTracking) Alert.alert('Aviso', 'No se registraron datos suficientes para guardar el recorrido.');
+    }
+    
+    // Limpiar estado
+    setRouteCoordinates([]);
+    setCurrentStepCount(0);
+    setSelectedPet(null);
+  };
+
+  const handleStartPress = () => {
+    if (myPets.length === 0) {
+      Alert.alert('Sin mascotas', 'Necesitas registrar una mascota en tu perfil para iniciar un recorrido.');
+      return;
+    }
+    if (myPets.length === 1) {
+      startTracking(myPets[0]);
+    } else {
+      setShowPetSelectionModal(true);
+    }
+  };
 
   // actualizar coordenada del centro al mover el mapa (solo en modo creación)
   useEffect(() => {
@@ -226,7 +551,94 @@ const MapComponent = () => {
             onCalloutPress={handleCalloutPress}
           />
         ))}
+
+        {/* Ruta actual */}
+        {isTracking && routeCoordinates.length > 0 && (
+          <Polyline
+            coordinates={routeCoordinates}
+            strokeColor="#3b82f6"
+            strokeWidth={4}
+          />
+        )}
       </MapView>
+
+      {/* Panel de control de recorrido */}
+      {isTracking && (
+        <View style={twrnc`absolute top-12 left-4 right-4 bg-white rounded-xl p-4 shadow-lg flex-row justify-between items-center`}>
+          <View>
+            <Text style={twrnc`text-gray-500 text-xs font-bold uppercase`}>Paseando a</Text>
+            <Text style={twrnc`text-lg font-bold text-gray-800`}>{selectedPet?.nombre}</Text>
+          </View>
+          <View style={twrnc`items-center`}>
+            <View style={twrnc`flex-row items-center`}>
+              <Footprints size={20} color="#3b82f6" />
+              <Text style={twrnc`text-2xl font-bold ml-2 text-blue-600`}>{currentStepCount}</Text>
+            </View>
+            <Text style={twrnc`text-xs text-gray-500`}>{usingPedometer ? 'pasos' : 'pasos (est.)'}</Text>
+          </View>
+          <TouchableOpacity
+            style={twrnc`bg-red-500 p-3 rounded-full`}
+            onPress={() => Alert.alert(
+              'Terminar recorrido',
+              '¿Deseas finalizar y guardar el recorrido?',
+              [
+                { text: 'Cancelar', style: 'cancel' },
+                { text: 'Finalizar', onPress: stopTracking }
+              ]
+            )}
+          >
+            <Square size={20} color="white" fill="white" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Botón para iniciar recorrido (solo si no está creando punto ni rastreando) */}
+      {!createMode && !isTracking && (
+        <TouchableOpacity
+          style={twrnc`absolute bottom-40 right-3 bg-green-500 w-14 h-14 rounded-full items-center justify-center shadow-lg`}
+          onPress={handleStartPress}
+        >
+          <Play size={24} color="white" fill="white" />
+        </TouchableOpacity>
+      )}
+
+      {/* Modal de selección de mascota */}
+      <Modal
+        visible={showPetSelectionModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPetSelectionModal(false)}
+      >
+        <View style={twrnc`flex-1 bg-black bg-opacity-50 justify-end`}>
+          <View style={twrnc`bg-white rounded-t-2xl p-6`}>
+            <Text style={twrnc`text-xl font-bold mb-4 text-center`}>¿Con quién vas a pasear?</Text>
+            <FlatList
+              data={myPets}
+              keyExtractor={(item, index) => item.mascota_id?.toString() || index.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={twrnc`flex-row items-center p-4 border-b border-gray-100`}
+                  onPress={() => startTracking(item)}
+                >
+                  <View style={twrnc`w-10 h-10 bg-blue-100 rounded-full items-center justify-center mr-4`}>
+                    <Text style={twrnc`text-xl`}>🐾</Text>
+                  </View>
+                  <View>
+                    <Text style={twrnc`font-bold text-lg`}>{item.nombre}</Text>
+                    <Text style={twrnc`text-gray-500`}>{item.especie}</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity
+              style={twrnc`mt-4 bg-gray-200 p-4 rounded-xl items-center`}
+              onPress={() => setShowPetSelectionModal(false)}
+            >
+              <Text style={twrnc`font-bold text-gray-700`}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* pin rojo en el centro del mapa (solo visible en modo creación) */}
       {createMode && (
