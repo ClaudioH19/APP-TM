@@ -9,18 +9,18 @@ const FOOTER_HEIGHT = 56;
 const Footer = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  
+
   // Función para determinar si una ruta está activa
   const isActive = (routeName) => {
     return route.name === routeName;
   };
-  
+
   // Colores para iconos activos e inactivos
   const activeColor = '#5bbbe8';
   const inactiveColor = '#9ca3af';
 
   return (
-    <SafeAreaView edges={['left','right','bottom']} style={styles.safeArea}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
       <View style={styles.outer}>
         <View style={styles.row}>
           <Pressable style={styles.item} onPress={() => navigation.navigate('Home')}>
@@ -39,7 +39,7 @@ const Footer = () => {
             </View>
           </Pressable>
 
-          <Pressable style={styles.item}>
+          <Pressable style={styles.item} onPress={() => navigation.navigate('Health')}>
             <Heart size={24} color={isActive('Health') ? activeColor : inactiveColor} />
             <Text style={isActive('Health') ? styles.primaryText : styles.secondaryText}>Salud</Text>
           </Pressable>

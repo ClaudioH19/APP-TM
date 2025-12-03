@@ -9,6 +9,7 @@ import Register from './components/Register';
 import Header from './components/Header';
 import CreatePost from './components/CreatePost';
 import MapComponent from './components/MapComponent';
+import HealthCenter from './components/HealthCenter';
 import ScreenWrapper from './components/ScreenWrapper';
 import "./global.css";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -72,6 +73,7 @@ export default function App() {
         <Stack.Screen name="Register" component={Register} options={{ title: 'Registro' }} />
         <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
         <Stack.Screen name="CreatePost" component={CreatePost} options={{ title: 'Crear Publicación' }} />
+        <Stack.Screen name="Health" component={HealthCenter} options={{ headerShown: false }} />
         <Stack.Screen name="Map" component={MapScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
