@@ -11,6 +11,8 @@ router.get('/historial/categorias', authMiddleware, HistorialController.getCateg
 
 router.get('/historial/estados', authMiddleware, HistorialController.getEstados);
 router.patch('/historial/:id/estado', authMiddleware, HistorialController.cambiarEstado);
+router.get('/historial/contar-por-estado', authMiddleware, HistorialController.contarPorEstado);
+router.get('/historial/por-estado/:estado', authMiddleware, HistorialController.listarPorEstado);
 
 router.patch('/historial/:id', authMiddleware, HistorialController.update);
 router.delete('/historial/:id', authMiddleware, HistorialController.remove);

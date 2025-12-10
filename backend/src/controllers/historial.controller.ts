@@ -7,6 +7,8 @@ import {
   removeHistorial,
   cambiarEstadoHistorial,
   ESTADOS_HISTORIAL,
+  contarEventosPorEstado,
+  obtenerEventosPorEstado,
 } from '../services/historial.service';
 import { obtenerGruposTiposEventoParaUI } from '../config/historial_categorias';
 
@@ -145,7 +147,7 @@ export class HistorialController {
       const msg = e?.message || 'Error';
       const code =
         msg === 'No autorizado' ? 403 :
-        msg === 'Evento no encontrado' ? 404 : 400;
+          msg === 'Evento no encontrado' ? 404 : 400;
       return res.status(code).json({ message: msg });
     }
   }
@@ -157,6 +159,45 @@ export class HistorialController {
       return res.json(ESTADOS_HISTORIAL);
     } catch (e: any) {
       return res.status(500).json({ message: e?.message || 'Error' });
+    }
+  }
+
+  // obtener cantidad de eventos agrupados por estado
+  static async contarPorEstado(req: any, res: Response) {
+    try {
+      if (!req.user) return res.status(401).json({ message: 'No autorizado' });
+      const contadores = await contarEventosPorEstado(req.user.usuario_id);
+      return res.json(contadores);
+    } catch (e: any) {
+      return res.status(500).json({ message: e?.message || 'Error al contar eventos' });
+    }
+  }
+
+  // obtener eventos filtrados por estado con paginación
+  static async listarPorEstado(req: any, res: Response) {
+    try {
+      if (!req.user) return res.status(401).json({ message: 'No autorizado' });
+
+      const estado = String(req.params.estado ?? '').trim();
+      if (!ESTADOS_HISTORIAL.includes(estado as any)) {
+        return res
+          .status(400)
+          .json({ message: `Estado inválido. Permitidos: ${ESTADOS_HISTORIAL.join(', ')}` });
+      }
+
+      const offset = Number(req.query.offset) || 0;
+      const limit = Number(req.query.limit) || 50;
+
+      const data = await obtenerEventosPorEstado(
+        req.user.usuario_id,
+        estado as any,
+        offset,
+        limit
+      );
+
+      return res.json(data);
+    } catch (e: any) {
+      return res.status(500).json({ message: e?.message || 'Error al obtener eventos' });
     }
   }
 }

@@ -287,3 +287,79 @@ export async function cambiarEstadoHistorial(
     },
   };
 }
+
+// obtener la cantidad de eventos agrupados por estado para un usuario
+export async function contarEventosPorEstado(propietarioId: number): Promise<Record<EstadoHistorial, number>> {
+  const repo = AppDataSource.getRepository(HistorialMedico);
+
+  // obtener todos los eventos del usuario
+  const items = await repo.find({
+    where: { mascota: { usuario: { usuario_id: propietarioId } as any } as any },
+  });
+
+  // inicializar contadores en 0
+  const contadores: Record<string, number> = {
+    pendiente: 0,
+    completado: 0,
+    cancelado: 0,
+    vencido: 0,
+  };
+
+  // contar eventos por estado
+  items.forEach(item => {
+    if (contadores[item.estado] !== undefined) {
+      contadores[item.estado]++;
+    }
+  });
+
+  return contadores as Record<EstadoHistorial, number>;
+}
+
+// obtener eventos filtrados por estado con paginación
+export async function obtenerEventosPorEstado(
+  propietarioId: number,
+  estado: EstadoHistorial,
+  offset = 0,
+  limit = 50
+) {
+  if (!ESTADOS_HISTORIAL.includes(estado)) {
+    throw new Error('Estado inválido');
+  }
+
+  const repo = AppDataSource.getRepository(HistorialMedico);
+  const safeOff = Math.max(0, Math.floor(Number(offset) || 0));
+  const safeLim = Math.max(1, Math.min(100, Math.floor(Number(limit) || 50)));
+
+  // obtener eventos con el estado especificado
+  const [items, total] = await repo.findAndCount({
+    where: { 
+      mascota: { usuario: { usuario_id: propietarioId } as any } as any,
+      estado: estado,
+    },
+    relations: { mascota: true },
+    order: { fecha: 'DESC' },
+    skip: safeOff,
+    take: safeLim,
+  });
+
+  // mapear para evitar exponer datos innecesarios
+  const sanitized = items.map(i => ({
+    id: i.id,
+    fecha: i.fecha,
+    categoria: i.categoria,
+    estado: i.estado,
+    titulo: i.titulo,
+    descripcion: i.descripcion,
+    ubicacion_clinica_lat: i.ubicacion_clinica_lat,
+    ubicacion_clinica_lon: i.ubicacion_clinica_lon,
+    mascota: {
+      mascota_id: i.mascota.mascota_id,
+      nombre: i.mascota.nombre,
+      descripcion: i.mascota.descripcion,
+      fecha_nacimiento: i.mascota.fecha_nacimiento,
+      especie: i.mascota.especie,
+    },
+  }));
+
+  return { items: sanitized, total };
+}
