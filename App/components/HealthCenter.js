@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, ActivityIndicator, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Modal } from 'react-native';
 import ScreenWrapper from './ScreenWrapper';
 import { API_ENDPOINTS } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Calendar, PawPrint, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react-native';
+import { Calendar, PawPrint, Clock, AlertCircle, CheckCircle, XCircle, X, MapPin, FileText } from 'lucide-react-native';
 
 const HealthCenter = () => {
     const [pets, setPets] = useState([]);
@@ -11,6 +11,8 @@ const HealthCenter = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
+    const [selectedEvent, setSelectedEvent] = useState(null);
+    const [modalVisible, setModalVisible] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -55,7 +57,7 @@ const HealthCenter = () => {
     };
 
     const fetchEvents = async (token) => {
-        const response = await fetch(`${API_ENDPOINTS.EVENTS}?offset=0&limit=20`, {
+        const response = await fetch(`${API_ENDPOINTS.EVENTS}?offset=0&limit=100`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         if (!response.ok) throw new Error('Error al obtener los eventos');
@@ -77,6 +79,27 @@ const HealthCenter = () => {
         });
 
         setEvents(sortedEvents);
+    };
+
+    // Agrupa eventos por mascota
+    const groupEventsByPet = () => {
+        const grouped = {};
+        
+        pets.forEach(pet => {
+            grouped[pet.mascota_id] = {
+                pet: pet,
+                events: []
+            };
+        });
+
+        events.forEach(event => {
+            const petId = event.mascota?.mascota_id;
+            if (petId && grouped[petId]) {
+                grouped[petId].events.push(event);
+            }
+        });
+
+        return Object.values(grouped);
     };
 
     const calculateAge = (birthDateString) => {
@@ -148,12 +171,22 @@ const HealthCenter = () => {
         </View>
     );
 
+    const handleEventPress = (event) => {
+        setSelectedEvent(event);
+        setModalVisible(true);
+    };
+
     const renderEventCard = (item) => {
         const statusColor = getStatusColor(item.estado);
         const daysRemaining = getDaysRemaining(item.fecha);
 
         return (
-            <View key={item.id} style={[styles.card, { borderLeftWidth: 4, borderLeftColor: statusColor }]}>
+            <TouchableOpacity 
+                key={item.id} 
+                style={[styles.card, { borderLeftWidth: 4, borderLeftColor: statusColor }]}
+                onPress={() => handleEventPress(item)}
+                activeOpacity={0.7}
+            >
                 <View style={styles.cardHeader}>
                     <View style={styles.headerText}>
                         <Text style={styles.eventTitle}>{item.titulo}</Text>
@@ -177,7 +210,7 @@ const HealthCenter = () => {
                         <Text style={styles.petRefText}>Mascota: {item.mascota.nombre}</Text>
                     </View>
                 </View>
-            </View>
+            </TouchableOpacity>
         );
     };
 
@@ -213,16 +246,135 @@ const HealthCenter = () => {
                         </View>
 
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Eventos</Text>
+                            <Text style={styles.sectionTitle}>Eventos por Mascota</Text>
                             {events.length === 0 ? (
                                 <Text style={styles.emptyText}>No hay eventos registrados.</Text>
                             ) : (
-                                events.map(event => renderEventCard(event))
+                                groupEventsByPet().map(({ pet, events: petEvents }) => (
+                                    <View key={pet.mascota_id} style={styles.petSection}>
+                                        <View style={styles.petSectionHeader}>
+                                            <PawPrint size={18} color="#5bbbe8" />
+                                            <Text style={styles.petSectionTitle}>{pet.nombre}</Text>
+                                            <Text style={styles.eventCount}>
+                                                {petEvents.length} {petEvents.length === 1 ? 'evento' : 'eventos'}
+                                            </Text>
+                                        </View>
+                                        {petEvents.length === 0 ? (
+                                            <Text style={styles.noPetEventsText}>
+                                                No hay eventos para esta mascota
+                                            </Text>
+                                        ) : (
+                                            petEvents.map(event => renderEventCard(event))
+                                        )}
+                                    </View>
+                                ))
                             )}
                         </View>
                     </>
                 )}
             </ScrollView>
+
+            {/* Modal de detalle de evento */}
+            <Modal
+                visible={modalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        {selectedEvent && (
+                            <>
+                                <View style={styles.modalHeader}>
+                                    <Text style={styles.modalTitle}>Detalle del Evento</Text>
+                                    <TouchableOpacity 
+                                        onPress={() => setModalVisible(false)}
+                                        style={styles.closeButton}
+                                    >
+                                        <X size={24} color="#6b7280" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                                    {/* Estado */}
+                                    <View style={[styles.modalStatusBadge, { backgroundColor: getStatusColor(selectedEvent.estado) + '20' }]}>
+                                        <Text style={[styles.modalStatusText, { color: getStatusColor(selectedEvent.estado) }]}>
+                                            {selectedEvent.estado}
+                                        </Text>
+                                    </View>
+
+                                    {/* Título */}
+                                    <View style={styles.modalSection}>
+                                        <Text style={styles.modalSectionTitle}>Título</Text>
+                                        <Text style={styles.modalSectionContent}>{selectedEvent.titulo}</Text>
+                                    </View>
+
+                                    {/* Categoría */}
+                                    <View style={styles.modalSection}>
+                                        <View style={styles.modalIconRow}>
+                                            <FileText size={18} color="#6b7280" />
+                                            <Text style={styles.modalSectionTitle}>Categoría</Text>
+                                        </View>
+                                        <Text style={styles.modalCategoryText}>{selectedEvent.categoria}</Text>
+                                    </View>
+
+                                    {/* Fecha */}
+                                    <View style={styles.modalSection}>
+                                        <View style={styles.modalIconRow}>
+                                            <Calendar size={18} color="#6b7280" />
+                                            <Text style={styles.modalSectionTitle}>Fecha</Text>
+                                        </View>
+                                        <Text style={styles.modalSectionContent}>{formatDate(selectedEvent.fecha)}</Text>
+                                        {getDaysRemaining(selectedEvent.fecha) && (
+                                            <Text style={styles.modalDaysRemaining}>
+                                                {getDaysRemaining(selectedEvent.fecha)}
+                                            </Text>
+                                        )}
+                                    </View>
+
+                                    {/* Descripción */}
+                                    {selectedEvent.descripcion && (
+                                        <View style={styles.modalSection}>
+                                            <Text style={styles.modalSectionTitle}>Descripción</Text>
+                                            <Text style={styles.modalDescriptionText}>{selectedEvent.descripcion}</Text>
+                                        </View>
+                                    )}
+
+                                    {/* Ubicación */}
+                                    {selectedEvent.ubicacion && (
+                                        <View style={styles.modalSection}>
+                                            <View style={styles.modalIconRow}>
+                                                <MapPin size={18} color="#6b7280" />
+                                                <Text style={styles.modalSectionTitle}>Ubicación</Text>
+                                            </View>
+                                            <Text style={styles.modalSectionContent}>{selectedEvent.ubicacion}</Text>
+                                        </View>
+                                    )}
+
+                                    {/* Mascota */}
+                                    <View style={styles.modalSection}>
+                                        <View style={styles.modalIconRow}>
+                                            <PawPrint size={18} color="#5bbbe8" />
+                                            <Text style={styles.modalSectionTitle}>Mascota</Text>
+                                        </View>
+                                        <View style={styles.modalPetCard}>
+                                            <Text style={styles.modalPetName}>{selectedEvent.mascota.nombre}</Text>
+                                            <Text style={styles.modalPetSpecies}>{selectedEvent.mascota.especie}</Text>
+                                        </View>
+                                    </View>
+                                </ScrollView>
+
+                                <TouchableOpacity 
+                                    style={styles.modalCloseButton}
+                                    onPress={() => setModalVisible(false)}
+                                >
+                                    <Text style={styles.modalCloseButtonText}>Cerrar</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </ScreenWrapper>
     );
 };
@@ -382,7 +534,157 @@ const styles = StyleSheet.create({
         marginLeft: 8,
         color: '#9ca3af',
         fontSize: 12,
-    }
+    },
+    petSection: {
+        marginBottom: 20,
+    },
+    petSectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f0f9ff',
+        padding: 12,
+        borderRadius: 10,
+        marginBottom: 12,
+        borderLeftWidth: 3,
+        borderLeftColor: '#5bbbe8',
+    },
+    petSectionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1e40af',
+        marginLeft: 8,
+        flex: 1,
+    },
+    eventCount: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#6b7280',
+        backgroundColor: '#e5e7eb',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    noPetEventsText: {
+        color: '#9ca3af',
+        fontStyle: 'italic',
+        fontSize: 14,
+        marginLeft: 12,
+        marginBottom: 8,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: 'white',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        maxHeight: '90%',
+        paddingTop: 20,
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb',
+    },
+    modalTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#1f2937',
+    },
+    closeButton: {
+        padding: 4,
+    },
+    modalBody: {
+        marginBottom: 20,
+    },
+    modalStatusBadge: {
+        alignSelf: 'flex-start',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 16,
+        marginBottom: 20,
+    },
+    modalStatusText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    modalSection: {
+        marginBottom: 20,
+    },
+    modalSectionTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#6b7280',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 8,
+    },
+    modalSectionContent: {
+        fontSize: 16,
+        color: '#1f2937',
+        lineHeight: 24,
+    },
+    modalIconRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 8,
+    },
+    modalCategoryText: {
+        fontSize: 16,
+        color: '#3b82f6',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+    },
+    modalDaysRemaining: {
+        fontSize: 14,
+        color: '#ef4444',
+        fontWeight: '600',
+        marginTop: 4,
+    },
+    modalDescriptionText: {
+        fontSize: 15,
+        color: '#4b5563',
+        lineHeight: 22,
+    },
+    modalPetCard: {
+        backgroundColor: '#f0f9ff',
+        padding: 12,
+        borderRadius: 10,
+        borderLeftWidth: 3,
+        borderLeftColor: '#5bbbe8',
+    },
+    modalPetName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#1e40af',
+        marginBottom: 4,
+    },
+    modalPetSpecies: {
+        fontSize: 14,
+        color: '#6b7280',
+        textTransform: 'capitalize',
+    },
+    modalCloseButton: {
+        backgroundColor: '#3b82f6',
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    modalCloseButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
+    },
 });
 
 export default HealthCenter;
