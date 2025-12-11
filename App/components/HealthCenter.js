@@ -472,19 +472,6 @@ const HealthCenter = () => {
             
             // Mostrar alert después de cerrar el modal
             setTimeout(() => {
-                cardHeaderRight: {
-                    alignItems: 'flex-end',
-                },
-                completeSwitchContainer: {
-                    marginTop: 8,
-                    alignItems: 'flex-end',
-                },
-                completeSwitchLabel: {
-                    fontSize: 12,
-                    color: '#6b7280',
-                    marginBottom: 4,
-                    fontWeight: '600',
-                },
                 Alert.alert('Éxito', 'Evento creado correctamente');
             }, 100);
             
@@ -1282,6 +1269,19 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'flex-start',
         marginBottom: 12,
+    },
+    cardHeaderRight: {
+        alignItems: 'flex-end',
+    },
+    completeSwitchContainer: {
+        marginTop: 8,
+        alignItems: 'flex-end',
+    },
+    completeSwitchLabel: {
+        fontSize: 12,
+        color: '#6b7280',
+        marginBottom: 4,
+        fontWeight: '600',
     },
     iconContainer: {
         width: 40,
