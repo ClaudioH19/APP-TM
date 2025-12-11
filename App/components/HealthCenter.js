@@ -493,12 +493,20 @@ const HealthCenter = () => {
                 return;
             }
 
+            if (!editForm.fecha || !editForm.hora) {
+                setSaving(false);
+                Alert.alert('Error', 'La fecha y la hora son obligatorias para actualizar el evento');
+                return;
+            }
+
             // Actualizar información del evento
             const eventUpdateBody = {
+                fecha: editForm.fecha,
                 categoria: editForm.categoria,
                 hora: editForm.hora,
                 titulo: editForm.titulo,
                 descripcion: editForm.descripcion,
+                estado: editForm.estado,
                 lat: parseFloat(editForm.lat),
                 lon: parseFloat(editForm.lon)
             };
@@ -515,23 +523,6 @@ const HealthCenter = () => {
             if (!eventResponse.ok) {
                 const errorData = await eventResponse.json().catch(() => ({}));
                 throw new Error(errorData.message || 'Error al actualizar el evento');
-            }
-
-            // Actualizar estado si cambió
-            if (editForm.estado !== selectedEvent.estado) {
-                const statusResponse = await fetch(`${API_ENDPOINTS.EVENTS}/${selectedEvent.id}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ estado: editForm.estado })
-                });
-
-                if (!statusResponse.ok) {
-                    const errorData = await statusResponse.json().catch(() => ({}));
-                    throw new Error(errorData.message || 'Error al actualizar el estado');
-                }
             }
 
             setSaving(false);
@@ -808,7 +799,6 @@ const HealthCenter = () => {
                                                     >
                                                         <Picker.Item label="Pendiente" value="pendiente" />
                                                         <Picker.Item label="Completado" value="completado" />
-                                                        <Picker.Item label="Próximo" value="proximo" />
                                                         <Picker.Item label="Vencido" value="vencido" />
                                                     </Picker>
                                                 </View>
