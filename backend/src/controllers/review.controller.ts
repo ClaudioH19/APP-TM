@@ -10,7 +10,11 @@ export class ReviewController {
       const { puntoInteresId, descripcion, valoracion } = req.body;
       
       // obtiene el ID del usuario del token autenticado
-      const usuarioId = (req as any).user.usuario_id;
+      const usuarioId = (req as any).user?.usuario_id;
+
+      if (!usuarioId) {
+        return res.status(401).json({ error: 'No autorizado' });
+      }
 
       // valida los campos obligatorios
       if (!puntoInteresId || valoracion == null) {
@@ -34,14 +38,27 @@ export class ReviewController {
   }
 
   static async getReviewsForPoint(req: Request, res: Response) {
-   try {
-      const { id } = req.params;
+    try {
+      // requiere auth: el middleware debe haber seteado req.user
+      const authUser = (req as any).user;
+      if (!authUser) {
+        return res.status(401).json({ error: 'No autorizado' });
+      }
 
+      const { id } = req.params;
       if (!id) {
         return res.status(400).json({ error: 'Falta el ID del punto de interés' });
       }
-      const reseñas = await ReviewService.getByPointId(Number(id));
-      return res.json(reseñas); 
+
+      // paginación basada en índice del front (index) o alias offset
+      // limit controla cuántas reseñas traer por página
+      const indexRaw = String(req.query.index ?? req.query.offset ?? 0);
+      const limitRaw = String(req.query.limit ?? 10);
+      const offset = Math.max(0, parseInt(indexRaw, 10) || 0);
+      const limit = Math.min(100, Math.max(1, parseInt(limitRaw, 10) || 10));
+
+      const { items, total } = await ReviewService.getByPointId(Number(id), offset, limit);
+      return res.json({ items, total, offset, limit });
 
     } catch (error: any) {
       console.error('Error al obtener reseñas:', error);

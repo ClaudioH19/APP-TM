@@ -1,6 +1,12 @@
 import { Request, Response } from 'express';
 import { verifyToken, getUserFromToken } from '../services/token_service';
 import { createUser, generateToken } from '../services/token_service';
+import { AppDataSource } from '../data-source';
+import { Usuario } from '../entities/Usuario';
+
+interface MulterRequest extends Request {
+  file?: Express.Multer.File;
+}
 
 export class AuthController {
   static async login(req: Request, res: Response) {
@@ -39,10 +45,80 @@ export class AuthController {
       if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
      
-      const { contrasena, ...safeUser } = (user as any);
-      return res.json({ user: safeUser });
+      const { contrasena, avatar, ...safeUser } = (user as any);
+      
+      // Si tiene avatar, convertirlo a base64
+      let avatarData = null;
+      if (avatar && user.avatar_mime_type) {
+        avatarData = {
+          data: avatar.toString('base64'),
+          mimeType: user.avatar_mime_type
+        };
+      }
+      
+      return res.json({ user: { ...safeUser, avatar: avatarData } });
     } catch (err: any) {
       return res.status(401).json({ error: err.message || 'Token inválido' });
+    }
+  }
+
+  static async uploadAvatar(req: MulterRequest, res: Response) {
+    try {
+      const auth = req.headers.authorization || '';
+      const token = auth.startsWith('Bearer ') ? auth.slice(7) : auth;
+
+      if (!token) {
+        return res.status(401).json({ error: 'Sin token' });
+      }
+
+      const user = await getUserFromToken(token);
+      if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'No se proporcionó imagen' });
+      }
+
+      // Guardar avatar como bytea
+      const usuarioRepo = AppDataSource.getRepository(Usuario);
+      await usuarioRepo.update(user.usuario_id, {
+        avatar: req.file.buffer,
+        avatar_mime_type: req.file.mimetype
+      });
+
+      return res.json({ 
+        message: 'Avatar actualizado',
+        avatar: {
+          data: req.file.buffer.toString('base64'),
+          mimeType: req.file.mimetype
+        }
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'Error al subir avatar' });
+    }
+  }
+
+  static async deleteAvatar(req: Request, res: Response) {
+    try {
+      const auth = req.headers.authorization || '';
+      const token = auth.startsWith('Bearer ') ? auth.slice(7) : auth;
+
+      if (!token) {
+        return res.status(401).json({ error: 'Sin token' });
+      }
+
+      const user = await getUserFromToken(token);
+      if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+      // Eliminar avatar
+      const usuarioRepo = AppDataSource.getRepository(Usuario);
+      await usuarioRepo.update(user.usuario_id, {
+        avatar: null,
+        avatar_mime_type: null
+      });
+
+      return res.json({ message: 'Avatar eliminado' });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'Error al eliminar avatar' });
     }
   }
 }
