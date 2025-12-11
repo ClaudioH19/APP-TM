@@ -80,7 +80,7 @@ const HealthCenter = () => {
                 fetchEventCounts(token)
             ]);
         } catch (err) {
-            console.error(err);
+            console.error('Error al cargar datos:', err);
             setError('Error al cargar los datos');
         } finally {
             setLoading(false);
@@ -404,6 +404,7 @@ const HealthCenter = () => {
             const token = await AsyncStorage.getItem('token');
             
             if (!token) {
+                setCreating(false);
                 Alert.alert('Error', 'No se encontró token de autenticación');
                 return;
             }
@@ -428,17 +429,23 @@ const HealthCenter = () => {
             });
 
             if (!response.ok) {
-                throw new Error('Error al crear el evento');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || 'Error al crear el evento');
             }
 
-            Alert.alert('Éxito', 'Evento creado correctamente');
+            setCreating(false);
             setCreateModalVisible(false);
+            
+            // Mostrar alert después de cerrar el modal
+            setTimeout(() => {
+                Alert.alert('Éxito', 'Evento creado correctamente');
+            }, 100);
+            
             await fetchData();
         } catch (err) {
-            console.error(err);
-            Alert.alert('Error', err.message || 'No se pudo crear el evento');
-        } finally {
+            console.error('Error al crear evento:', err);
             setCreating(false);
+            Alert.alert('Error', err.message || 'No se pudo crear el evento');
         }
     };
 
@@ -448,6 +455,7 @@ const HealthCenter = () => {
             const token = await AsyncStorage.getItem('token');
             
             if (!token) {
+                setSaving(false);
                 Alert.alert('Error', 'No se encontró token de autenticación');
                 return;
             }
@@ -472,7 +480,8 @@ const HealthCenter = () => {
             });
 
             if (!eventResponse.ok) {
-                throw new Error('Error al actualizar el evento');
+                const errorData = await eventResponse.json().catch(() => ({}));
+                throw new Error(errorData.message || 'Error al actualizar el evento');
             }
 
             // Actualizar estado si cambió
@@ -487,19 +496,25 @@ const HealthCenter = () => {
                 });
 
                 if (!statusResponse.ok) {
-                    throw new Error('Error al actualizar el estado');
+                    const errorData = await statusResponse.json().catch(() => ({}));
+                    throw new Error(errorData.message || 'Error al actualizar el estado');
                 }
             }
 
-            Alert.alert('Éxito', 'Evento actualizado correctamente');
+            setSaving(false);
             setIsEditMode(false);
             setModalVisible(false);
+            
+            // Mostrar alert después de cerrar el modal
+            setTimeout(() => {
+                Alert.alert('Éxito', 'Evento actualizado correctamente');
+            }, 100);
+            
             await fetchData();
         } catch (err) {
-            console.error(err);
-            Alert.alert('Error', err.message || 'No se pudo actualizar el evento');
-        } finally {
+            console.error('Error al actualizar evento:', err);
             setSaving(false);
+            Alert.alert('Error', err.message || 'No se pudo actualizar el evento');
         }
     };
 
