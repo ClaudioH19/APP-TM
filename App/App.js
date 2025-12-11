@@ -9,6 +9,7 @@ import Register from './components/Register';
 import Header from './components/Header';
 import CreatePost from './components/CreatePost';
 import MapComponent from './components/MapComponent';
+import HealthCenter from './components/HealthCenter';
 import Perfil from './components/Perfil';
 import ScreenWrapper from './components/ScreenWrapper';
 import "./global.css";
