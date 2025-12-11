@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, ActivityIndicator, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, Platform } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, Platform, Switch } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import MapView, { Marker } from 'react-native-maps';
@@ -57,6 +57,7 @@ const HealthCenter = () => {
         estado: ''
     });
     const [saving, setSaving] = useState(false);
+    const [updatingEventStatus, setUpdatingEventStatus] = useState({});
 
     const renderCategorySelector = (selectedValue, onSelect) => {
         if (!Array.isArray(categories) || categories.length === 0) {
@@ -471,6 +472,19 @@ const HealthCenter = () => {
             
             // Mostrar alert después de cerrar el modal
             setTimeout(() => {
+                cardHeaderRight: {
+                    alignItems: 'flex-end',
+                },
+                completeSwitchContainer: {
+                    marginTop: 8,
+                    alignItems: 'flex-end',
+                },
+                completeSwitchLabel: {
+                    fontSize: 12,
+                    color: '#6b7280',
+                    marginBottom: 4,
+                    fontWeight: '600',
+                },
                 Alert.alert('Éxito', 'Evento creado correctamente');
             }, 100);
             
@@ -542,9 +556,53 @@ const HealthCenter = () => {
         }
     };
 
+    const handleToggleCompleted = async (eventItem, nextValue) => {
+        // UX: solo permitir pasar de pendiente -> completado
+        if (!nextValue) return;
+        if (!eventItem?.id) return;
+
+        const currentStatus = String(eventItem.estado || '').toLowerCase();
+        if (currentStatus !== 'pendiente') return;
+
+        try {
+            setUpdatingEventStatus((prev) => ({ ...prev, [eventItem.id]: true }));
+            const token = await AsyncStorage.getItem('token');
+            if (!token) {
+                Alert.alert('Error', 'No se encontró token de autenticación');
+                return;
+            }
+
+            const resp = await fetch(`${API_ENDPOINTS.EVENTS}/${eventItem.id}/estado`, {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ estado: 'completado' }),
+            });
+
+            if (!resp.ok) {
+                const errorData = await resp.json().catch(() => ({}));
+                throw new Error(errorData.message || 'No se pudo actualizar el estado');
+            }
+
+            // Refrescar solo eventos/contadores para mantener el orden y la UI
+            await Promise.all([fetchEvents(token), fetchEventCounts(token)]);
+        } catch (err) {
+            console.error('Error cambiando estado:', err);
+            Alert.alert('Error', err.message || 'No se pudo actualizar el estado');
+        } finally {
+            setUpdatingEventStatus((prev) => ({ ...prev, [eventItem.id]: false }));
+        }
+    };
+
     const renderEventCard = (item) => {
         const statusColor = getStatusColor(item.estado);
         const daysRemaining = getDaysRemaining(item.fecha);
+        const currentStatus = String(item.estado || '').toLowerCase();
+        const isCompleted = currentStatus === 'completado';
+        const canToggle = currentStatus === 'pendiente';
+        const isUpdating = Boolean(updatingEventStatus[item.id]);
 
         return (
             <TouchableOpacity 
@@ -558,8 +616,23 @@ const HealthCenter = () => {
                         <Text style={styles.eventTitle}>{item.titulo}</Text>
                         <Text style={styles.eventCategory}>{item.categoria}</Text>
                     </View>
-                    <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-                        <Text style={[styles.statusText, { color: statusColor }]}>{item.estado}</Text>
+                    <View style={styles.cardHeaderRight}>
+                        <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
+                            <Text style={[styles.statusText, { color: statusColor }]}>{item.estado}</Text>
+                        </View>
+                        <View
+                            style={styles.completeSwitchContainer}
+                            onTouchStart={(e) => e.stopPropagation && e.stopPropagation()}
+                        >
+                            <Text style={styles.completeSwitchLabel}>Completado</Text>
+                            <Switch
+                                value={isCompleted}
+                                disabled={!canToggle || isUpdating || isCompleted}
+                                onValueChange={(val) => handleToggleCompleted(item, val)}
+                                trackColor={{ false: '#e5e7eb', true: '#10b981' }}
+                                thumbColor={isCompleted ? '#ffffff' : '#ffffff'}
+                            />
+                        </View>
                     </View>
                 </View>
 
