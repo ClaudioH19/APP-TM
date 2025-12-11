@@ -58,6 +58,39 @@ const HealthCenter = () => {
     });
     const [saving, setSaving] = useState(false);
 
+    const renderCategorySelector = (selectedValue, onSelect) => {
+        if (!Array.isArray(categories) || categories.length === 0) {
+            return <Text style={styles.emptyText}>No hay categorías disponibles.</Text>;
+        }
+
+        return (
+            <View style={styles.categoryGroups}>
+                {categories.map((group) => (
+                    <View key={group.key ?? group.label} style={styles.categoryGroup}>
+                        <Text style={styles.categoryGroupTitle}>{group.label}</Text>
+                        <View style={styles.categoryItemsRow}>
+                            {(group.items || []).map((item) => {
+                                const selected = selectedValue === item.value;
+                                return (
+                                    <TouchableOpacity
+                                        key={item.value}
+                                        style={[styles.categoryChip, selected && styles.categoryChipSelected]}
+                                        onPress={() => onSelect(item.value)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={[styles.categoryChipText, selected && styles.categoryChipTextSelected]}>
+                                            {item.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </View>
+                ))}
+            </View>
+        );
+    };
+
     useEffect(() => {
         fetchData();
         fetchCategories();
@@ -793,12 +826,9 @@ const HealthCenter = () => {
 
                                             <View style={styles.modalSection}>
                                                 <Text style={styles.modalSectionTitle}>Categoría</Text>
-                                                <TextInput
-                                                    style={styles.input}
-                                                    value={editForm.categoria}
-                                                    onChangeText={(text) => setEditForm({...editForm, categoria: text})}
-                                                    placeholder="Categoría"
-                                                />
+                                                {renderCategorySelector(editForm.categoria, (value) =>
+                                                    setEditForm({ ...editForm, categoria: value })
+                                                )}
                                             </View>
 
                                             <View style={styles.modalSection}>
@@ -1009,18 +1039,9 @@ const HealthCenter = () => {
                                     {/* Categoría */}
                                     <View style={styles.modalSection}>
                                         <Text style={styles.modalSectionTitle}>Categoría *</Text>
-                                        <View style={styles.pickerContainer}>
-                                            <Picker
-                                                selectedValue={createForm.categoria}
-                                                onValueChange={(value) => setCreateForm({...createForm, categoria: value})}
-                                                style={styles.picker}
-                                            >
-                                                <Picker.Item label="Selecciona una categoría" value="" />
-                                                {categories.map((cat, index) => (
-                                                    <Picker.Item key={index} label={cat.label} value={cat.label} />
-                                                ))}
-                                            </Picker>
-                                        </View>
+                                        {renderCategorySelector(createForm.categoria, (value) =>
+                                            setCreateForm({ ...createForm, categoria: value })
+                                        )}
                                     </View>
 
                                     {/* Fecha */}
@@ -1545,6 +1566,44 @@ const styles = StyleSheet.create({
     },
     picker: {
         height: 50,
+    },
+    categoryGroups: {
+        marginTop: 8,
+    },
+    categoryGroup: {
+        marginBottom: 12,
+    },
+    categoryGroupTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#374151',
+        marginBottom: 8,
+    },
+    categoryItemsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+    },
+    categoryChip: {
+        backgroundColor: '#f3f4f6',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 999,
+        marginRight: 8,
+        marginBottom: 8,
+    },
+    categoryChipSelected: {
+        backgroundColor: '#3b82f6',
+        borderColor: '#3b82f6',
+    },
+    categoryChipText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+    },
+    categoryChipTextSelected: {
+        color: 'white',
     },
     locationText: {
         fontSize: 14,
