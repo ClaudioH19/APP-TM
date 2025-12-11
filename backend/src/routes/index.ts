@@ -7,6 +7,7 @@ import usuarioRouter from './usuarios';
 import commentRouter from './comment';
 import mascotasRouter from './mascota';
 import historialRouter from './historial';
+import recorridoRouter from './recorrido';
 const router = Router();
 
 
@@ -27,6 +28,6 @@ router.use('/reviews', reviewRouter);
 router.use('/usuarios', usuarioRouter);
 router.use('/mascotas', mascotasRouter);
 router.use('/', historialRouter);
-
+router.use('/recorridos', recorridoRouter);
 
 export default router;

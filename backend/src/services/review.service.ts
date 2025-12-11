@@ -62,13 +62,30 @@ export class ReviewService {
     });
   }
 
-  static async getByPointId(pointId: number): Promise<Resena[]> {
+  // obtiene reseñas por punto con paginación (devuelve items + total)
+  static async getByPointId(pointId: number, offset = 0, limit = 10): Promise<{ items: Resena[], total: number }> {
+    // normalizar/validar inputs
+    const pid = Number(pointId);
+    if (!Number.isInteger(pid) || pid <= 0) {
+      throw new Error('ID de punto inválido');
+    }
+
+    let off = Number(offset);
+    let lim = Number(limit);
+
+    if (!Number.isFinite(off) || off < 0) off = 0;
+    off = Math.floor(off);
+
+    if (!Number.isFinite(lim) || lim <= 0) lim = 10;
+    lim = Math.floor(lim);
+
+    const MAX_LIMIT = 100;
+    if (lim > MAX_LIMIT) lim = MAX_LIMIT;
+
     const reviewRepository = AppDataSource.getRepository(Resena);
-    // obtiene todas las reseñas para el punto de interés especificado
-    // incluyendo la información del usuario que la creó, y ordenadas por fecha de creación descendente
-    // solo incluye campos seguros del usuario
-    return reviewRepository.find({
-     select: {
+
+    const [items, total] = await reviewRepository.findAndCount({
+      select: {
         id: true,
         fecha_creacion: true,
         descripcion: true,
@@ -78,16 +95,13 @@ export class ReviewService {
           nombre: true,
         }
       },
-
-      where: {
-        puntoInteres: { id: pointId }
-      },
-      relations: {
-        usuario: true
-      },
-      order: {
-        fecha_creacion: 'DESC'
-      }
+      where: { puntoInteres: { id: pid } },
+      relations: { usuario: true },
+      order: { fecha_creacion: 'DESC' },
+      skip: off,
+      take: lim
     });
+
+    return { items, total };
   }
 }
