@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, ActivityIndicator, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, Platform } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import MapView, { Marker } from 'react-native-maps';
 import ScreenWrapper from './ScreenWrapper';
 import { API_ENDPOINTS } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Calendar, PawPrint, Clock, AlertCircle, CheckCircle, XCircle, X, MapPin, FileText } from 'lucide-react-native';
+import { Calendar, PawPrint, Clock, AlertCircle, CheckCircle, XCircle, X, MapPin, FileText, Edit2, Save } from 'lucide-react-native';
 
 const HealthCenter = () => {
     const [pets, setPets] = useState([]);
@@ -13,9 +16,51 @@ const HealthCenter = () => {
     const [error, setError] = useState(null);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [eventCounts, setEventCounts] = useState({
+        pendiente: 0,
+        completado: 0,
+        cancelado: 0,
+        vencido: 0
+    });
+    const [mapModalVisible, setMapModalVisible] = useState(false);
+    const [mapRegion, setMapRegion] = useState({
+        latitude: -31.4201,
+        longitude: -64.1888,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+    });
+    const [createModalVisible, setCreateModalVisible] = useState(false);
+    const [selectedPetForCreate, setSelectedPetForCreate] = useState(null);
+    const [createForm, setCreateForm] = useState({
+        titulo: '',
+        categoria: '',
+        descripcion: '',
+        fecha: '',
+        hora: '',
+        lat: '',
+        lon: ''
+    });
+    const [creating, setCreating] = useState(false);
+    const [isMapForCreate, setIsMapForCreate] = useState(false);
+    const [categories, setCategories] = useState([]);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [editForm, setEditForm] = useState({
+        titulo: '',
+        categoria: '',
+        descripcion: '',
+        fecha: '',
+        hora: '',
+        lat: '',
+        lon: '',
+        estado: ''
+    });
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         fetchData();
+        fetchCategories();
     }, []);
 
     const fetchData = async () => {
@@ -31,7 +76,8 @@ const HealthCenter = () => {
 
             await Promise.all([
                 fetchPets(token),
-                fetchEvents(token)
+                fetchEvents(token),
+                fetchEventCounts(token)
             ]);
         } catch (err) {
             console.error(err);
@@ -79,6 +125,31 @@ const HealthCenter = () => {
         });
 
         setEvents(sortedEvents);
+    };
+
+    const fetchEventCounts = async (token) => {
+        const response = await fetch(`${API_ENDPOINTS.EVENTS}/contar-por-estado`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error('Error al obtener el conteo de eventos');
+        const data = await response.json();
+        setEventCounts(data);
+    };
+
+    const fetchCategories = async () => {
+        try {
+            const token = await AsyncStorage.getItem('token');
+            if (!token) return;
+
+            const response = await fetch(`${API_ENDPOINTS.EVENTS}/categorias`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!response.ok) throw new Error('Error al obtener categorías');
+            const data = await response.json();
+            setCategories(data);
+        } catch (err) {
+            console.error('Error cargando categorías:', err);
+        }
     };
 
     // Agrupa eventos por mascota
@@ -167,13 +238,269 @@ const HealthCenter = () => {
                 {item.descripcion && (
                     <Text style={styles.description}>{item.descripcion}</Text>
                 )}
+                <TouchableOpacity
+                    style={styles.addEventButton}
+                    onPress={() => handleOpenCreateModal(item)}
+                >
+                    <Text style={styles.addEventButtonText}>+ Añadir Evento</Text>
+                </TouchableOpacity>
             </View>
         </View>
     );
 
+    const isEventEditable = (event) => {
+        const eventDate = new Date(event.fecha);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        eventDate.setHours(0, 0, 0, 0);
+        return eventDate >= today;
+    };
+
     const handleEventPress = (event) => {
         setSelectedEvent(event);
         setModalVisible(true);
+        setIsEditMode(false);
+        // Extraer fecha y hora del campo fecha del evento
+        const eventDate = new Date(event.fecha);
+        const dateStr = eventDate.toISOString().split('T')[0];
+        const timeStr = event.hora || eventDate.toTimeString().split(' ')[0].substring(0, 5);
+        
+        setEditForm({
+            titulo: event.titulo || '',
+            categoria: event.categoria || '',
+            descripcion: event.descripcion || '',
+            fecha: dateStr,
+            hora: timeStr,
+            lat: event.ubicacion_clinica_lat?.toString() || '',
+            lon: event.ubicacion_clinica_lon?.toString() || '',
+            estado: event.estado || ''
+        });
+    };
+
+    const handleEditToggle = () => {
+        if (!isEventEditable(selectedEvent)) {
+            Alert.alert(
+                'No se puede editar',
+                'Solo puedes editar eventos con fecha actual o futura.'
+            );
+            return;
+        }
+        setIsEditMode(!isEditMode);
+    };
+
+    const handleOpenMapModal = () => {
+        const lat = parseFloat(editForm.lat) || -31.4201;
+        const lon = parseFloat(editForm.lon) || -64.1888;
+        setMapRegion({
+            latitude: lat,
+            longitude: lon,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+        });
+        setMapModalVisible(true);
+    };
+
+    const handleMapRegionChange = (region) => {
+        setMapRegion(region);
+    };
+
+    const handleConfirmLocation = () => {
+        if (isMapForCreate) {
+            setCreateForm({
+                ...createForm,
+                lat: mapRegion.latitude.toFixed(6),
+                lon: mapRegion.longitude.toFixed(6)
+            });
+        } else {
+            setEditForm({
+                ...editForm,
+                lat: mapRegion.latitude.toFixed(6),
+                lon: mapRegion.longitude.toFixed(6)
+            });
+        }
+        setMapModalVisible(false);
+        setIsMapForCreate(false);
+    };
+
+    const formatDateForDisplay = (date) => {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+    };
+
+    const formatDateForAPI = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const handleDateChange = (event, date) => {
+        setShowDatePicker(Platform.OS === 'ios');
+        if (date) {
+            setSelectedDate(date);
+            setCreateForm({
+                ...createForm,
+                fecha: formatDateForAPI(date)
+            });
+        }
+    };
+
+    const handleOpenCreateModal = (pet) => {
+        setSelectedPetForCreate(pet);
+        const today = new Date();
+        setSelectedDate(today);
+        setCreateForm({
+            titulo: '',
+            categoria: '',
+            descripcion: '',
+            fecha: formatDateForAPI(today),
+            hora: '',
+            lat: '',
+            lon: ''
+        });
+        setCreateModalVisible(true);
+    };
+
+    const handleOpenMapForCreate = () => {
+        const lat = parseFloat(createForm.lat) || -31.4201;
+        const lon = parseFloat(createForm.lon) || -64.1888;
+        setMapRegion({
+            latitude: lat,
+            longitude: lon,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+        });
+        setIsMapForCreate(true);
+        setMapModalVisible(true);
+    };
+
+    const handleCreateEvent = async () => {
+        try {
+            // Validaciones
+            if (!createForm.titulo.trim()) {
+                Alert.alert('Error', 'El título es obligatorio');
+                return;
+            }
+            if (!createForm.categoria.trim()) {
+                Alert.alert('Error', 'La categoría es obligatoria');
+                return;
+            }
+            if (!createForm.fecha) {
+                Alert.alert('Error', 'La fecha es obligatoria');
+                return;
+            }
+            if (!createForm.hora) {
+                Alert.alert('Error', 'La hora es obligatoria');
+                return;
+            }
+            if (!createForm.lat || !createForm.lon) {
+                Alert.alert('Error', 'Debes seleccionar una ubicación en el mapa');
+                return;
+            }
+
+            setCreating(true);
+            const token = await AsyncStorage.getItem('token');
+            
+            if (!token) {
+                Alert.alert('Error', 'No se encontró token de autenticación');
+                return;
+            }
+
+            const body = {
+                categoria: createForm.categoria.trim(),
+                fecha: createForm.fecha,
+                hora: createForm.hora,
+                titulo: createForm.titulo.trim(),
+                descripcion: createForm.descripcion.trim() || undefined,
+                lat: parseFloat(createForm.lat),
+                lon: parseFloat(createForm.lon)
+            };
+
+            const response = await fetch(`${API_ENDPOINTS.PETS}/${selectedPetForCreate.mascota_id}/historial`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                throw new Error('Error al crear el evento');
+            }
+
+            Alert.alert('Éxito', 'Evento creado correctamente');
+            setCreateModalVisible(false);
+            await fetchData();
+        } catch (err) {
+            console.error(err);
+            Alert.alert('Error', err.message || 'No se pudo crear el evento');
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    const handleSave = async () => {
+        try {
+            setSaving(true);
+            const token = await AsyncStorage.getItem('token');
+            
+            if (!token) {
+                Alert.alert('Error', 'No se encontró token de autenticación');
+                return;
+            }
+
+            // Actualizar información del evento
+            const eventUpdateBody = {
+                categoria: editForm.categoria,
+                hora: editForm.hora,
+                titulo: editForm.titulo,
+                descripcion: editForm.descripcion,
+                lat: parseFloat(editForm.lat),
+                lon: parseFloat(editForm.lon)
+            };
+
+            const eventResponse = await fetch(`${API_ENDPOINTS.EVENTS}/${selectedEvent.id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(eventUpdateBody)
+            });
+
+            if (!eventResponse.ok) {
+                throw new Error('Error al actualizar el evento');
+            }
+
+            // Actualizar estado si cambió
+            if (editForm.estado !== selectedEvent.estado) {
+                const statusResponse = await fetch(`${API_ENDPOINTS.EVENTS}/${selectedEvent.id}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ estado: editForm.estado })
+                });
+
+                if (!statusResponse.ok) {
+                    throw new Error('Error al actualizar el estado');
+                }
+            }
+
+            Alert.alert('Éxito', 'Evento actualizado correctamente');
+            setIsEditMode(false);
+            setModalVisible(false);
+            await fetchData();
+        } catch (err) {
+            console.error(err);
+            Alert.alert('Error', err.message || 'No se pudo actualizar el evento');
+        } finally {
+            setSaving(false);
+        }
     };
 
     const renderEventCard = (item) => {
@@ -236,6 +563,26 @@ const HealthCenter = () => {
                             <Text style={styles.mainTitle}>Centro de Salud</Text>
                         </View>
 
+                        {/* Contadores de eventos por estado */}
+                        <View style={styles.countersContainer}>
+                            <View style={[styles.counterCard, { backgroundColor: '#fef3c7' }]}>
+                                <Text style={styles.counterNumber}>{eventCounts.pendiente}</Text>
+                                <Text style={[styles.counterLabel, { color: '#f59e0b' }]}>Pendiente</Text>
+                            </View>
+                            <View style={[styles.counterCard, { backgroundColor: '#d1fae5' }]}>
+                                <Text style={styles.counterNumber}>{eventCounts.completado}</Text>
+                                <Text style={[styles.counterLabel, { color: '#10b981' }]}>Completado</Text>
+                            </View>
+                            <View style={[styles.counterCard, { backgroundColor: '#fee2e2' }]}>
+                                <Text style={styles.counterNumber}>{eventCounts.vencido}</Text>
+                                <Text style={[styles.counterLabel, { color: '#ef4444' }]}>Vencido</Text>
+                            </View>
+                            <View style={[styles.counterCard, { backgroundColor: '#e5e7eb' }]}>
+                                <Text style={styles.counterNumber}>{eventCounts.cancelado}</Text>
+                                <Text style={[styles.counterLabel, { color: '#6b7280' }]}>Cancelado</Text>
+                            </View>
+                        </View>
+
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Mis Mascotas</Text>
                             {pets.length === 0 ? (
@@ -286,9 +633,14 @@ const HealthCenter = () => {
                         {selectedEvent && (
                             <>
                                 <View style={styles.modalHeader}>
-                                    <Text style={styles.modalTitle}>Detalle del Evento</Text>
+                                    <Text style={styles.modalTitle}>
+                                        {isEditMode ? 'Editar Evento' : 'Detalle del Evento'}
+                                    </Text>
                                     <TouchableOpacity 
-                                        onPress={() => setModalVisible(false)}
+                                        onPress={() => {
+                                            setModalVisible(false);
+                                            setIsEditMode(false);
+                                        }}
                                         style={styles.closeButton}
                                     >
                                         <X size={24} color="#6b7280" />
@@ -296,61 +648,326 @@ const HealthCenter = () => {
                                 </View>
 
                                 <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-                                    {/* Estado */}
-                                    <View style={[styles.modalStatusBadge, { backgroundColor: getStatusColor(selectedEvent.estado) + '20' }]}>
-                                        <Text style={[styles.modalStatusText, { color: getStatusColor(selectedEvent.estado) }]}>
-                                            {selectedEvent.estado}
-                                        </Text>
-                                    </View>
-
-                                    {/* Título */}
-                                    <View style={styles.modalSection}>
-                                        <Text style={styles.modalSectionTitle}>Título</Text>
-                                        <Text style={styles.modalSectionContent}>{selectedEvent.titulo}</Text>
-                                    </View>
-
-                                    {/* Categoría */}
-                                    <View style={styles.modalSection}>
-                                        <View style={styles.modalIconRow}>
-                                            <FileText size={18} color="#6b7280" />
-                                            <Text style={styles.modalSectionTitle}>Categoría</Text>
-                                        </View>
-                                        <Text style={styles.modalCategoryText}>{selectedEvent.categoria}</Text>
-                                    </View>
-
-                                    {/* Fecha */}
-                                    <View style={styles.modalSection}>
-                                        <View style={styles.modalIconRow}>
-                                            <Calendar size={18} color="#6b7280" />
-                                            <Text style={styles.modalSectionTitle}>Fecha</Text>
-                                        </View>
-                                        <Text style={styles.modalSectionContent}>{formatDate(selectedEvent.fecha)}</Text>
-                                        {getDaysRemaining(selectedEvent.fecha) && (
-                                            <Text style={styles.modalDaysRemaining}>
-                                                {getDaysRemaining(selectedEvent.fecha)}
-                                            </Text>
-                                        )}
-                                    </View>
-
-                                    {/* Descripción */}
-                                    {selectedEvent.descripcion && (
-                                        <View style={styles.modalSection}>
-                                            <Text style={styles.modalSectionTitle}>Descripción</Text>
-                                            <Text style={styles.modalDescriptionText}>{selectedEvent.descripcion}</Text>
-                                        </View>
-                                    )}
-
-                                    {/* Ubicación */}
-                                    {selectedEvent.ubicacion && (
-                                        <View style={styles.modalSection}>
-                                            <View style={styles.modalIconRow}>
-                                                <MapPin size={18} color="#6b7280" />
-                                                <Text style={styles.modalSectionTitle}>Ubicación</Text>
+                                    {!isEditMode ? (
+                                        <>
+                                            {/* Modo Vista */}
+                                            <View style={[styles.modalStatusBadge, { backgroundColor: getStatusColor(selectedEvent.estado) + '20' }]}>
+                                                <Text style={[styles.modalStatusText, { color: getStatusColor(selectedEvent.estado) }]}>
+                                                    {selectedEvent.estado}
+                                                </Text>
                                             </View>
-                                            <Text style={styles.modalSectionContent}>{selectedEvent.ubicacion}</Text>
-                                        </View>
-                                    )}
 
+                                            <View style={styles.modalSection}>
+                                                <Text style={styles.modalSectionTitle}>Título</Text>
+                                                <Text style={styles.modalSectionContent}>{selectedEvent.titulo}</Text>
+                                            </View>
+
+                                            <View style={styles.modalSection}>
+                                                <View style={styles.modalIconRow}>
+                                                    <FileText size={18} color="#6b7280" />
+                                                    <Text style={styles.modalSectionTitle}>Categoría</Text>
+                                                </View>
+                                                <Text style={styles.modalCategoryText}>{selectedEvent.categoria}</Text>
+                                            </View>
+
+                                            <View style={styles.modalSection}>
+                                                <View style={styles.modalIconRow}>
+                                                    <Calendar size={18} color="#6b7280" />
+                                                    <Text style={styles.modalSectionTitle}>Fecha</Text>
+                                                </View>
+                                                <Text style={styles.modalSectionContent}>{formatDate(selectedEvent.fecha)}</Text>
+                                                {getDaysRemaining(selectedEvent.fecha) && (
+                                                    <Text style={styles.modalDaysRemaining}>
+                                                        {getDaysRemaining(selectedEvent.fecha)}
+                                                    </Text>
+                                                )}
+                                            </View>
+
+                                            {selectedEvent.hora && (
+                                                <View style={styles.modalSection}>
+                                                    <View style={styles.modalIconRow}>
+                                                        <Clock size={18} color="#6b7280" />
+                                                        <Text style={styles.modalSectionTitle}>Hora</Text>
+                                                    </View>
+                                                    <Text style={styles.modalSectionContent}>{selectedEvent.hora}</Text>
+                                                </View>
+                                            )}
+
+                                            {selectedEvent.descripcion && (
+                                                <View style={styles.modalSection}>
+                                                    <Text style={styles.modalSectionTitle}>Descripción</Text>
+                                                    <Text style={styles.modalDescriptionText}>{selectedEvent.descripcion}</Text>
+                                                </View>
+                                            )}
+
+                                            {(selectedEvent.ubicacion_clinica_lat && selectedEvent.ubicacion_clinica_lon) && (
+                                                <View style={styles.modalSection}>
+                                                    <View style={styles.modalIconRow}>
+                                                        <MapPin size={18} color="#6b7280" />
+                                                        <Text style={styles.modalSectionTitle}>Ubicación</Text>
+                                                    </View>
+                                                    <Text style={styles.modalSectionContent}>
+                                                        Lat: {selectedEvent.ubicacion_clinica_lat}, Lon: {selectedEvent.ubicacion_clinica_lon}
+                                                    </Text>
+                                                    {/* Mapa estático mostrando la ubicación */}
+                                                    <View style={styles.staticMapContainer}>
+                                                        <MapView
+                                                            style={styles.staticMap}
+                                                            initialRegion={{
+                                                                latitude: parseFloat(selectedEvent.ubicacion_clinica_lat),
+                                                                longitude: parseFloat(selectedEvent.ubicacion_clinica_lon),
+                                                                latitudeDelta: 0.005,
+                                                                longitudeDelta: 0.005,
+                                                            }}
+                                                            scrollEnabled={false}
+                                                            zoomEnabled={false}
+                                                            pitchEnabled={false}
+                                                            rotateEnabled={false}
+                                                        >
+                                                            <Marker
+                                                                coordinate={{
+                                                                    latitude: parseFloat(selectedEvent.ubicacion_clinica_lat),
+                                                                    longitude: parseFloat(selectedEvent.ubicacion_clinica_lon),
+                                                                }}
+                                                                title={selectedEvent.titulo}
+                                                            />
+                                                        </MapView>
+                                                    </View>
+                                                </View>
+                                            )}
+
+                                            <View style={styles.modalSection}>
+                                                <View style={styles.modalIconRow}>
+                                                    <PawPrint size={18} color="#5bbbe8" />
+                                                    <Text style={styles.modalSectionTitle}>Mascota</Text>
+                                                </View>
+                                                <View style={styles.modalPetCard}>
+                                                    <Text style={styles.modalPetName}>{selectedEvent.mascota.nombre}</Text>
+                                                    <Text style={styles.modalPetSpecies}>{selectedEvent.mascota.especie}</Text>
+                                                </View>
+                                            </View>
+                                        </>
+                                    ) : (
+                                        <>
+                                            {/* Modo Edición */}
+                                            <View style={styles.modalSection}>
+                                                <Text style={styles.modalSectionTitle}>Estado</Text>
+                                                <View style={styles.pickerContainer}>
+                                                    <Picker
+                                                        selectedValue={editForm.estado}
+                                                        onValueChange={(value) => setEditForm({...editForm, estado: value})}
+                                                        style={styles.picker}
+                                                    >
+                                                        <Picker.Item label="Pendiente" value="pendiente" />
+                                                        <Picker.Item label="Completado" value="completado" />
+                                                        <Picker.Item label="Próximo" value="proximo" />
+                                                        <Picker.Item label="Vencido" value="vencido" />
+                                                    </Picker>
+                                                </View>
+                                            </View>
+
+                                            <View style={styles.modalSection}>
+                                                <Text style={styles.modalSectionTitle}>Título</Text>
+                                                <TextInput
+                                                    style={styles.input}
+                                                    value={editForm.titulo}
+                                                    onChangeText={(text) => setEditForm({...editForm, titulo: text})}
+                                                    placeholder="Título del evento"
+                                                />
+                                            </View>
+
+                                            <View style={styles.modalSection}>
+                                                <Text style={styles.modalSectionTitle}>Categoría</Text>
+                                                <TextInput
+                                                    style={styles.input}
+                                                    value={editForm.categoria}
+                                                    onChangeText={(text) => setEditForm({...editForm, categoria: text})}
+                                                    placeholder="Categoría"
+                                                />
+                                            </View>
+
+                                            <View style={styles.modalSection}>
+                                                <Text style={styles.modalSectionTitle}>Hora (HH:MM)</Text>
+                                                <TextInput
+                                                    style={styles.input}
+                                                    value={editForm.hora}
+                                                    onChangeText={(text) => setEditForm({...editForm, hora: text})}
+                                                    placeholder="19:30"
+                                                />
+                                            </View>
+
+                                            <View style={styles.modalSection}>
+                                                <Text style={styles.modalSectionTitle}>Descripción</Text>
+                                                <TextInput
+                                                    style={[styles.input, styles.textArea]}
+                                                    value={editForm.descripcion}
+                                                    onChangeText={(text) => setEditForm({...editForm, descripcion: text})}
+                                                    placeholder="Descripción del evento"
+                                                    multiline
+                                                    numberOfLines={4}
+                                                />
+                                            </View>
+
+                                            <View style={styles.modalSection}>
+                                                <View style={styles.modalIconRow}>
+                                                    <MapPin size={18} color="#6b7280" />
+                                                    <Text style={styles.modalSectionTitle}>Ubicación</Text>
+                                                </View>
+                                                {editForm.lat && editForm.lon ? (
+                                                    <Text style={styles.locationText}>
+                                                        Lat: {parseFloat(editForm.lat).toFixed(4)}, Lon: {parseFloat(editForm.lon).toFixed(4)}
+                                                    </Text>
+                                                ) : (
+                                                    <Text style={styles.noLocationText}>Sin ubicación definida</Text>
+                                                )}
+                                                <TouchableOpacity
+                                                    style={styles.mapButton}
+                                                    onPress={handleOpenMapModal}
+                                                >
+                                                    <MapPin size={18} color="#3b82f6" />
+                                                    <Text style={styles.mapButtonText}>Seleccionar en mapa</Text>
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            <View style={styles.modalSection}>
+                                                <View style={styles.modalIconRow}>
+                                                    <PawPrint size={18} color="#5bbbe8" />
+                                                    <Text style={styles.modalSectionTitle}>Mascota</Text>
+                                                </View>
+                                                <View style={styles.modalPetCard}>
+                                                    <Text style={styles.modalPetName}>{selectedEvent.mascota.nombre}</Text>
+                                                    <Text style={styles.modalPetSpecies}>{selectedEvent.mascota.especie}</Text>
+                                                </View>
+                                            </View>
+                                        </>
+                                    )}
+                                </ScrollView>
+
+                                {!isEditMode ? (
+                                    <View style={styles.modalButtonsRow}>
+                                        {isEventEditable(selectedEvent) && (
+                                            <TouchableOpacity 
+                                                style={styles.modalEditButton}
+                                                onPress={handleEditToggle}
+                                            >
+                                                <Edit2 size={18} color="#fff" />
+                                                <Text style={styles.modalEditButtonText}>Editar</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        <TouchableOpacity 
+                                            style={[styles.modalCloseButton, !isEventEditable(selectedEvent) && {flex: 1}]}
+                                            onPress={() => setModalVisible(false)}
+                                        >
+                                            <Text style={styles.modalCloseButtonText}>Cerrar</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : (
+                                    <View style={styles.modalButtonsRow}>
+                                        <TouchableOpacity 
+                                            style={[styles.modalCancelButton]}
+                                            onPress={() => setIsEditMode(false)}
+                                            disabled={saving}
+                                        >
+                                            <Text style={styles.modalCancelButtonText}>Cancelar</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity 
+                                            style={[styles.modalSaveButton, saving && styles.modalButtonDisabled]}
+                                            onPress={handleSave}
+                                            disabled={saving}
+                                        >
+                                            {saving ? (
+                                                <ActivityIndicator color="#fff" size="small" />
+                                            ) : (
+                                                <>
+                                                    <Save size={18} color="#fff" />
+                                                    <Text style={styles.modalSaveButtonText}>Guardar</Text>
+                                                </>
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                            </>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal de mapa para seleccionar ubicación */}
+            <Modal
+                visible={mapModalVisible}
+                animationType="slide"
+                transparent={false}
+                onRequestClose={() => setMapModalVisible(false)}
+            >
+                <View style={styles.mapModalContainer}>
+                    <View style={styles.mapModalHeader}>
+                        <Text style={styles.mapModalTitle}>Seleccionar Ubicación</Text>
+                        <TouchableOpacity 
+                            onPress={() => setMapModalVisible(false)}
+                            style={styles.closeButton}
+                        >
+                            <X size={24} color="#6b7280" />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.mapContainer}>
+                        <MapView
+                            style={styles.map}
+                            region={mapRegion}
+                            onRegionChangeComplete={handleMapRegionChange}
+                        />
+                        {/* Marcador fijo en el centro */}
+                        <View style={styles.centerMarker}>
+                            <MapPin size={40} color="#ef4444" fill="#ef4444" />
+                        </View>
+                    </View>
+
+                    <View style={styles.mapModalFooter}>
+                        <Text style={styles.coordinatesInfo}>
+                            Lat: {mapRegion.latitude.toFixed(6)}, Lon: {mapRegion.longitude.toFixed(6)}
+                        </Text>
+                        <View style={styles.mapModalButtons}>
+                            <TouchableOpacity
+                                style={styles.mapCancelButton}
+                                onPress={() => setMapModalVisible(false)}
+                            >
+                                <Text style={styles.mapCancelButtonText}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.mapConfirmButton}
+                                onPress={handleConfirmLocation}
+                            >
+                                <Text style={styles.mapConfirmButtonText}>
+                                    {isMapForCreate ? 'Seleccionar Ubicación' : 'Cambiar Ubicación'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal para crear nuevo evento */}
+            <Modal
+                visible={createModalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setCreateModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        {selectedPetForCreate && (
+                            <>
+                                <View style={styles.modalHeader}>
+                                    <Text style={styles.modalTitle}>Nuevo Evento</Text>
+                                    <TouchableOpacity 
+                                        onPress={() => setCreateModalVisible(false)}
+                                        style={styles.closeButton}
+                                    >
+                                        <X size={24} color="#6b7280" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
                                     {/* Mascota */}
                                     <View style={styles.modalSection}>
                                         <View style={styles.modalIconRow}>
@@ -358,18 +975,132 @@ const HealthCenter = () => {
                                             <Text style={styles.modalSectionTitle}>Mascota</Text>
                                         </View>
                                         <View style={styles.modalPetCard}>
-                                            <Text style={styles.modalPetName}>{selectedEvent.mascota.nombre}</Text>
-                                            <Text style={styles.modalPetSpecies}>{selectedEvent.mascota.especie}</Text>
+                                            <Text style={styles.modalPetName}>{selectedPetForCreate.nombre}</Text>
+                                            <Text style={styles.modalPetSpecies}>{selectedPetForCreate.especie}</Text>
                                         </View>
+                                    </View>
+
+                                    {/* Título */}
+                                    <View style={styles.modalSection}>
+                                        <Text style={styles.modalSectionTitle}>Título *</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            value={createForm.titulo}
+                                            onChangeText={(text) => setCreateForm({...createForm, titulo: text})}
+                                            placeholder="Título del evento"
+                                        />
+                                    </View>
+
+                                    {/* Categoría */}
+                                    <View style={styles.modalSection}>
+                                        <Text style={styles.modalSectionTitle}>Categoría *</Text>
+                                        <View style={styles.pickerContainer}>
+                                            <Picker
+                                                selectedValue={createForm.categoria}
+                                                onValueChange={(value) => setCreateForm({...createForm, categoria: value})}
+                                                style={styles.picker}
+                                            >
+                                                <Picker.Item label="Selecciona una categoría" value="" />
+                                                {categories.map((cat, index) => (
+                                                    <Picker.Item key={index} label={cat.label} value={cat.label} />
+                                                ))}
+                                            </Picker>
+                                        </View>
+                                    </View>
+
+                                    {/* Fecha */}
+                                    <View style={styles.modalSection}>
+                                        <Text style={styles.modalSectionTitle}>Fecha *</Text>
+                                        <TouchableOpacity
+                                            style={styles.datePickerButton}
+                                            onPress={() => setShowDatePicker(true)}
+                                        >
+                                            <Calendar size={18} color="#6b7280" />
+                                            <Text style={styles.datePickerText}>
+                                                {createForm.fecha ? formatDateForDisplay(selectedDate) : 'Seleccionar fecha'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                        {showDatePicker && (
+                                            <DateTimePicker
+                                                value={selectedDate}
+                                                mode="date"
+                                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                                onChange={handleDateChange}
+                                                minimumDate={new Date()}
+                                            />
+                                        )}
+                                    </View>
+
+                                    {/* Hora */}
+                                    <View style={styles.modalSection}>
+                                        <Text style={styles.modalSectionTitle}>Hora (HH:MM) *</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            value={createForm.hora}
+                                            onChangeText={(text) => setCreateForm({...createForm, hora: text})}
+                                            placeholder="10:30"
+                                        />
+                                    </View>
+
+                                    {/* Descripción */}
+                                    <View style={styles.modalSection}>
+                                        <Text style={styles.modalSectionTitle}>Descripción</Text>
+                                        <TextInput
+                                            style={[styles.input, styles.textArea]}
+                                            value={createForm.descripcion}
+                                            onChangeText={(text) => setCreateForm({...createForm, descripcion: text})}
+                                            placeholder="Descripción del evento (opcional)"
+                                            multiline
+                                            numberOfLines={4}
+                                        />
+                                    </View>
+
+                                    {/* Ubicación */}
+                                    <View style={styles.modalSection}>
+                                        <View style={styles.modalIconRow}>
+                                            <MapPin size={18} color="#6b7280" />
+                                            <Text style={styles.modalSectionTitle}>Ubicación *</Text>
+                                        </View>
+                                        {createForm.lat && createForm.lon ? (
+                                            <Text style={styles.locationText}>
+                                                Lat: {parseFloat(createForm.lat).toFixed(4)}, Lon: {parseFloat(createForm.lon).toFixed(4)}
+                                            </Text>
+                                        ) : (
+                                            <Text style={styles.noLocationText}>Sin ubicación definida</Text>
+                                        )}
+                                        <TouchableOpacity
+                                            style={styles.mapButton}
+                                            onPress={handleOpenMapForCreate}
+                                        >
+                                            <MapPin size={18} color="#3b82f6" />
+                                            <Text style={styles.mapButtonText}>Seleccionar ubicación</Text>
+                                        </TouchableOpacity>
                                     </View>
                                 </ScrollView>
 
-                                <TouchableOpacity 
-                                    style={styles.modalCloseButton}
-                                    onPress={() => setModalVisible(false)}
-                                >
-                                    <Text style={styles.modalCloseButtonText}>Cerrar</Text>
-                                </TouchableOpacity>
+                                <View style={styles.modalButtonsRow}>
+                                    <TouchableOpacity 
+                                        style={styles.modalCancelButton}
+                                        onPress={() => setCreateModalVisible(false)}
+                                        disabled={creating}
+                                    >
+                                        <Text style={styles.modalCancelButtonText}>Cancelar</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity 
+                                        style={[styles.modalSaveButton, creating && styles.modalButtonDisabled]}
+                                        onPress={handleCreateEvent}
+                                        disabled={creating}
+                                    >
+                                        {creating ? (
+                                            <ActivityIndicator color="#fff" size="small" />
+                                        ) : (
+                                            <>
+                                                <Save size={18} color="#fff" />
+                                                <Text style={styles.modalSaveButtonText}>Crear Evento</Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
                             </>
                         )}
                     </View>
@@ -530,6 +1261,19 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
         marginTop: 4,
     },
+    addEventButton: {
+        marginTop: 12,
+        backgroundColor: '#10b981',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    addEventButtonText: {
+        color: 'white',
+        fontSize: 14,
+        fontWeight: '600',
+    },
     petRefText: {
         marginLeft: 8,
         color: '#9ca3af',
@@ -570,6 +1314,35 @@ const styles = StyleSheet.create({
         fontSize: 14,
         marginLeft: 12,
         marginBottom: 8,
+    },
+    countersContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 24,
+        gap: 8,
+    },
+    counterCard: {
+        flex: 1,
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    counterNumber: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: '#1f2937',
+        marginBottom: 4,
+    },
+    counterLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        textAlign: 'center',
     },
     modalOverlay: {
         flex: 1,
@@ -674,7 +1447,27 @@ const styles = StyleSheet.create({
         color: '#6b7280',
         textTransform: 'capitalize',
     },
+    modalButtonsRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    modalEditButton: {
+        flex: 1,
+        backgroundColor: '#f59e0b',
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    modalEditButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
+    },
     modalCloseButton: {
+        flex: 1,
         backgroundColor: '#3b82f6',
         padding: 16,
         borderRadius: 12,
@@ -684,6 +1477,185 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 16,
         fontWeight: '600',
+    },
+    modalCancelButton: {
+        flex: 1,
+        backgroundColor: '#6b7280',
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    modalCancelButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    modalSaveButton: {
+        flex: 1,
+        backgroundColor: '#10b981',
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    modalSaveButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    modalButtonDisabled: {
+        opacity: 0.6,
+    },
+    input: {
+        backgroundColor: '#f9fafb',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 15,
+        color: '#1f2937',
+    },
+    textArea: {
+        minHeight: 100,
+        textAlignVertical: 'top',
+    },
+    pickerContainer: {
+        backgroundColor: '#f9fafb',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        borderRadius: 8,
+        overflow: 'hidden',
+    },
+    picker: {
+        height: 50,
+    },
+    locationText: {
+        fontSize: 14,
+        color: '#4b5563',
+        marginBottom: 8,
+    },
+    noLocationText: {
+        fontSize: 14,
+        color: '#9ca3af',
+        fontStyle: 'italic',
+        marginBottom: 8,
+    },
+    mapButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#eff6ff',
+        padding: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#bfdbfe',
+        gap: 8,
+    },
+    mapButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#3b82f6',
+    },
+    datePickerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f9fafb',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        borderRadius: 8,
+        padding: 12,
+        gap: 12,
+    },
+    datePickerText: {
+        fontSize: 15,
+        color: '#1f2937',
+    },
+    mapModalContainer: {
+        flex: 1,
+        backgroundColor: 'white',
+    },
+    mapModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb',
+        backgroundColor: 'white',
+    },
+    mapModalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#1f2937',
+    },
+    mapContainer: {
+        flex: 1,
+        position: 'relative',
+    },
+    map: {
+        flex: 1,
+    },
+    centerMarker: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        marginLeft: -20,
+        marginTop: -40,
+        zIndex: 1,
+    },
+    mapModalFooter: {
+        backgroundColor: 'white',
+        padding: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#e5e7eb',
+    },
+    coordinatesInfo: {
+        fontSize: 14,
+        color: '#6b7280',
+        textAlign: 'center',
+        marginBottom: 12,
+        fontWeight: '500',
+    },
+    mapModalButtons: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    mapCancelButton: {
+        flex: 1,
+        backgroundColor: '#6b7280',
+        padding: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    mapCancelButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    mapConfirmButton: {
+        flex: 1,
+        backgroundColor: '#10b981',
+        padding: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    mapConfirmButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    staticMapContainer: {
+        marginTop: 12,
+        height: 200,
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+    },
+    staticMap: {
+        flex: 1,
     },
 });
 
