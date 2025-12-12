@@ -1,6 +1,6 @@
 // permite simplificar las llamadas a la API y una ip global para todo el frontend
 
-export const API_URL = 'http://192.168.229.202:3000';
+export const API_URL = 'http://192.168.38.202:3000';
 
 export const API_ENDPOINTS = {
   LOGIN: `${API_URL}/api/auth/login`,
@@ -17,5 +17,6 @@ export const API_ENDPOINTS = {
   RECORRIDOS: `${API_URL}/api/recorridos`, // Endpoint para recorridos
   USER_AVATAR: (userId) => `${API_URL}/api/usuarios/avatar/${userId}`,
   PROFILE_PETS: `${API_URL}/api/mascotas`,
+  MASCOTAS_ESPECIES: `${API_URL}/api/mascotas/especies`,
   AVATAR: `${API_URL}/api/auth/avatar`
 };
