@@ -6,7 +6,7 @@ import MapView, { Marker } from 'react-native-maps';
 import ScreenWrapper from './ScreenWrapper';
 import { API_ENDPOINTS } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Calendar, PawPrint, Clock, AlertCircle, CheckCircle, XCircle, X, MapPin, FileText, Edit2, Save } from 'lucide-react-native';
+import { Calendar, PawPrint, Clock, AlertCircle, CheckCircle, XCircle, X, MapPin, FileText, Edit2, Save, ChevronRight } from 'lucide-react-native';
 
 const HealthCenter = () => {
     const [pets, setPets] = useState([]);
@@ -58,6 +58,11 @@ const HealthCenter = () => {
     });
     const [saving, setSaving] = useState(false);
     const [updatingEventStatus, setUpdatingEventStatus] = useState({});
+
+    // estados para modal de eventos por mascota
+    const [petEventsModalVisible, setPetEventsModalVisible] = useState(false);
+    const [selectedPetForEvents, setSelectedPetForEvents] = useState(null); // null = todos los eventos, objeto = eventos de esa mascota
+    const [selectedEstadoFilter, setSelectedEstadoFilter] = useState(null); // filtro por estado: null = sin filtro, string = filtrar por ese estado
 
     const renderCategorySelector = (selectedValue, onSelect) => {
         if (!Array.isArray(categories) || categories.length === 0) {
@@ -144,11 +149,11 @@ const HealthCenter = () => {
         const data = await response.json();
         const items = data.items || [];
 
-        // Ordenar por urgencia
+        // ordenar por urgencia: próximos/pendientes primero, vencidos después, completados al final
         const urgencyMap = {
-            'vencido': 4,
-            'pendiente': 3,
-            'proximo': 2,
+            'pendiente': 4,
+            'proximo': 3,
+            'vencido': 2,
             'completado': 1
         };
 
@@ -189,7 +194,7 @@ const HealthCenter = () => {
     // Agrupa eventos por mascota
     const groupEventsByPet = () => {
         const grouped = {};
-        
+
         pets.forEach(pet => {
             grouped[pet.mascota_id] = {
                 pet: pet,
@@ -248,13 +253,52 @@ const HealthCenter = () => {
         }
     };
 
+    // formatear categoría usando el mapeo del backend
+    const formatCategoria = (categoria) => {
+        if (!categoria || !Array.isArray(categories)) return categoria;
+
+        // buscar en todos los grupos de categorías
+        for (const grupo of categories) {
+            if (!grupo.items) continue;
+            const found = grupo.items.find(item => item.value === categoria);
+            if (found) return found.label;
+        }
+
+        // si no se encuentra, retornar el valor original capitalizado
+        return categoria.split('_').map(word =>
+            word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+    };
+
+    // formatear estado para mostrar en UI
+    const formatEstado = (estado) => {
+        const estadosMap = {
+            'pendiente': 'Pendiente',
+            'completado': 'Completado',
+            'vencido': 'Vencido',
+            'cancelado': 'Cancelado',
+            'proximo': 'Próximo'
+        };
+        return estadosMap[estado?.toLowerCase()] || estado;
+    };
+
     const formatDate = (dateString) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
     };
 
     const renderPetCard = (item) => (
-        <View key={item.mascota_id} style={styles.card}>
+        <TouchableOpacity
+            key={item.mascota_id}
+            style={styles.card}
+            onPress={() => {
+                // filtrar eventos de esta mascota
+                const petEvents = events.filter(e => e.mascota?.mascota_id === item.mascota_id);
+                setSelectedPetForEvents({ ...item, events: petEvents });
+                setPetEventsModalVisible(true);
+            }}
+            activeOpacity={0.7}
+        >
             <View style={styles.cardHeader}>
                 <View style={styles.iconContainer}>
                     <PawPrint size={24} color="#5bbbe8" />
@@ -274,12 +318,15 @@ const HealthCenter = () => {
                 )}
                 <TouchableOpacity
                     style={styles.addEventButton}
-                    onPress={() => handleOpenCreateModal(item)}
+                    onPress={(e) => {
+                        e.stopPropagation(); // evitar que abra el modal
+                        handleOpenCreateModal(item);
+                    }}
                 >
                     <Text style={styles.addEventButtonText}>+ Añadir Evento</Text>
                 </TouchableOpacity>
             </View>
-        </View>
+        </TouchableOpacity>
     );
 
     const isEventEditable = (event) => {
@@ -298,7 +345,7 @@ const HealthCenter = () => {
         const eventDate = new Date(event.fecha);
         const dateStr = eventDate.toISOString().split('T')[0];
         const timeStr = event.hora || eventDate.toTimeString().split(' ')[0].substring(0, 5);
-        
+
         setEditForm({
             titulo: event.titulo || '',
             categoria: event.categoria || '',
@@ -436,7 +483,7 @@ const HealthCenter = () => {
 
             setCreating(true);
             const token = await AsyncStorage.getItem('token');
-            
+
             if (!token) {
                 setCreating(false);
                 Alert.alert('Error', 'No se encontró token de autenticación');
@@ -469,12 +516,12 @@ const HealthCenter = () => {
 
             setCreating(false);
             setCreateModalVisible(false);
-            
+
             // Mostrar alert después de cerrar el modal
             setTimeout(() => {
                 Alert.alert('Éxito', 'Evento creado correctamente');
             }, 100);
-            
+
             await fetchData();
         } catch (err) {
             console.error('Error al crear evento:', err);
@@ -487,7 +534,7 @@ const HealthCenter = () => {
         try {
             setSaving(true);
             const token = await AsyncStorage.getItem('token');
-            
+
             if (!token) {
                 setSaving(false);
                 Alert.alert('Error', 'No se encontró token de autenticación');
@@ -529,12 +576,12 @@ const HealthCenter = () => {
             setSaving(false);
             setIsEditMode(false);
             setModalVisible(false);
-            
+
             // Mostrar alert después de cerrar el modal
             setTimeout(() => {
                 Alert.alert('Éxito', 'Evento actualizado correctamente');
             }, 100);
-            
+
             await fetchData();
         } catch (err) {
             console.error('Error al actualizar evento:', err);
@@ -592,8 +639,8 @@ const HealthCenter = () => {
         const isUpdating = Boolean(updatingEventStatus[item.id]);
 
         return (
-            <TouchableOpacity 
-                key={item.id} 
+            <TouchableOpacity
+                key={item.id}
                 style={[styles.card, { borderLeftWidth: 4, borderLeftColor: statusColor }]}
                 onPress={() => handleEventPress(item)}
                 activeOpacity={0.7}
@@ -601,11 +648,11 @@ const HealthCenter = () => {
                 <View style={styles.cardHeader}>
                     <View style={styles.headerText}>
                         <Text style={styles.eventTitle}>{item.titulo}</Text>
-                        <Text style={styles.eventCategory}>{item.categoria}</Text>
+                        <Text style={styles.eventCategory}>{formatCategoria(item.categoria)}</Text>
                     </View>
                     <View style={styles.cardHeaderRight}>
                         <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-                            <Text style={[styles.statusText, { color: statusColor }]}>{item.estado}</Text>
+                            <Text style={[styles.statusText, { color: statusColor }]}>{formatEstado(item.estado)}</Text>
                         </View>
                         <View
                             style={styles.completeSwitchContainer}
@@ -664,22 +711,62 @@ const HealthCenter = () => {
 
                         {/* Contadores de eventos por estado */}
                         <View style={styles.countersContainer}>
-                            <View style={[styles.counterCard, { backgroundColor: '#fef3c7' }]}>
+                            <TouchableOpacity
+                                style={[styles.counterCard, { backgroundColor: '#fef3c7' }, selectedEstadoFilter === 'pendiente' && styles.counterCardActive]}
+                                onPress={() => {
+                                    if (selectedEstadoFilter === 'pendiente') {
+                                        setSelectedEstadoFilter(null); // quitar filtro si ya está activo
+                                    } else {
+                                        setSelectedEstadoFilter('pendiente');
+                                    }
+                                }}
+                                activeOpacity={0.7}
+                            >
                                 <Text style={styles.counterNumber}>{eventCounts.pendiente}</Text>
                                 <Text style={[styles.counterLabel, { color: '#f59e0b' }]}>Pendiente</Text>
-                            </View>
-                            <View style={[styles.counterCard, { backgroundColor: '#d1fae5' }]}>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.counterCard, { backgroundColor: '#d1fae5' }, selectedEstadoFilter === 'completado' && styles.counterCardActive]}
+                                onPress={() => {
+                                    if (selectedEstadoFilter === 'completado') {
+                                        setSelectedEstadoFilter(null);
+                                    } else {
+                                        setSelectedEstadoFilter('completado');
+                                    }
+                                }}
+                                activeOpacity={0.7}
+                            >
                                 <Text style={styles.counterNumber}>{eventCounts.completado}</Text>
                                 <Text style={[styles.counterLabel, { color: '#10b981' }]}>Completado</Text>
-                            </View>
-                            <View style={[styles.counterCard, { backgroundColor: '#fee2e2' }]}>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.counterCard, { backgroundColor: '#fee2e2' }, selectedEstadoFilter === 'vencido' && styles.counterCardActive]}
+                                onPress={() => {
+                                    if (selectedEstadoFilter === 'vencido') {
+                                        setSelectedEstadoFilter(null);
+                                    } else {
+                                        setSelectedEstadoFilter('vencido');
+                                    }
+                                }}
+                                activeOpacity={0.7}
+                            >
                                 <Text style={styles.counterNumber}>{eventCounts.vencido}</Text>
                                 <Text style={[styles.counterLabel, { color: '#ef4444' }]}>Vencido</Text>
-                            </View>
-                            <View style={[styles.counterCard, { backgroundColor: '#e5e7eb' }]}>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.counterCard, { backgroundColor: '#e5e7eb' }, selectedEstadoFilter === 'cancelado' && styles.counterCardActive]}
+                                onPress={() => {
+                                    if (selectedEstadoFilter === 'cancelado') {
+                                        setSelectedEstadoFilter(null);
+                                    } else {
+                                        setSelectedEstadoFilter('cancelado');
+                                    }
+                                }}
+                                activeOpacity={0.7}
+                            >
                                 <Text style={styles.counterNumber}>{eventCounts.cancelado}</Text>
                                 <Text style={[styles.counterLabel, { color: '#6b7280' }]}>Cancelado</Text>
-                            </View>
+                            </TouchableOpacity>
                         </View>
 
                         <View style={styles.section}>
@@ -691,30 +778,55 @@ const HealthCenter = () => {
                             )}
                         </View>
 
+                        {/* eventos recientes de todas las mascotas */}
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Eventos por Mascota</Text>
-                            {events.length === 0 ? (
-                                <Text style={styles.emptyText}>No hay eventos registrados.</Text>
-                            ) : (
-                                groupEventsByPet().map(({ pet, events: petEvents }) => (
-                                    <View key={pet.mascota_id} style={styles.petSection}>
-                                        <View style={styles.petSectionHeader}>
-                                            <PawPrint size={18} color="#5bbbe8" />
-                                            <Text style={styles.petSectionTitle}>{pet.nombre}</Text>
-                                            <Text style={styles.eventCount}>
-                                                {petEvents.length} {petEvents.length === 1 ? 'evento' : 'eventos'}
-                                            </Text>
-                                        </View>
-                                        {petEvents.length === 0 ? (
-                                            <Text style={styles.noPetEventsText}>
-                                                No hay eventos para esta mascota
-                                            </Text>
-                                        ) : (
-                                            petEvents.map(event => renderEventCard(event))
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                                <Text style={styles.sectionTitle}>
+                                    {selectedEstadoFilter ? `Eventos ${formatEstado(selectedEstadoFilter)}` : 'Eventos Recientes'}
+                                </Text>
+                                {selectedEstadoFilter && (
+                                    <TouchableOpacity
+                                        onPress={() => setSelectedEstadoFilter(null)}
+                                        style={{ backgroundColor: '#5bbbe8', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+                                    >
+                                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Limpiar filtro</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                            {(() => {
+                                // filtrar eventos si hay filtro activo
+                                const filteredEvents = selectedEstadoFilter
+                                    ? events.filter(e => e.estado.toLowerCase() === selectedEstadoFilter.toLowerCase())
+                                    : events;
+
+                                if (filteredEvents.length === 0) {
+                                    return <Text style={styles.emptyText}>
+                                        {selectedEstadoFilter ? `No hay eventos ${formatEstado(selectedEstadoFilter).toLowerCase()}` : 'No hay eventos registrados.'}
+                                    </Text>;
+                                }
+
+                                const eventsToShow = selectedEstadoFilter ? filteredEvents : filteredEvents.slice(0, 5);
+
+                                return (
+                                    <>
+                                        {eventsToShow.map(event => renderEventCard(event))}
+                                        {!selectedEstadoFilter && filteredEvents.length > 5 && (
+                                            <TouchableOpacity
+                                                style={styles.viewAllEventsButton}
+                                                onPress={() => {
+                                                    setSelectedPetForEvents(null);
+                                                    setPetEventsModalVisible(true);
+                                                }}
+                                            >
+                                                <Text style={styles.viewAllEventsButtonText}>
+                                                    Ver todos los {events.length} eventos
+                                                </Text>
+                                                <ChevronRight size={20} color="#fff" />
+                                            </TouchableOpacity>
                                         )}
-                                    </View>
-                                ))
-                            )}
+                                    </>
+                                );
+                            })()}
                         </View>
                     </>
                 )}
@@ -735,7 +847,7 @@ const HealthCenter = () => {
                                     <Text style={styles.modalTitle}>
                                         {isEditMode ? 'Editar Evento' : 'Detalle del Evento'}
                                     </Text>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         onPress={() => {
                                             setModalVisible(false);
                                             setIsEditMode(false);
@@ -752,7 +864,7 @@ const HealthCenter = () => {
                                             {/* Modo Vista */}
                                             <View style={[styles.modalStatusBadge, { backgroundColor: getStatusColor(selectedEvent.estado) + '20' }]}>
                                                 <Text style={[styles.modalStatusText, { color: getStatusColor(selectedEvent.estado) }]}>
-                                                    {selectedEvent.estado}
+                                                    {formatEstado(selectedEvent.estado)}
                                                 </Text>
                                             </View>
 
@@ -766,7 +878,7 @@ const HealthCenter = () => {
                                                     <FileText size={18} color="#6b7280" />
                                                     <Text style={styles.modalSectionTitle}>Categoría</Text>
                                                 </View>
-                                                <Text style={styles.modalCategoryText}>{selectedEvent.categoria}</Text>
+                                                <Text style={styles.modalCategoryText}>{formatCategoria(selectedEvent.categoria)}</Text>
                                             </View>
 
                                             <View style={styles.modalSection}>
@@ -854,7 +966,7 @@ const HealthCenter = () => {
                                                 <View style={styles.pickerContainer}>
                                                     <Picker
                                                         selectedValue={editForm.estado}
-                                                        onValueChange={(value) => setEditForm({...editForm, estado: value})}
+                                                        onValueChange={(value) => setEditForm({ ...editForm, estado: value })}
                                                         style={styles.picker}
                                                     >
                                                         <Picker.Item label="Pendiente" value="pendiente" />
@@ -869,7 +981,7 @@ const HealthCenter = () => {
                                                 <TextInput
                                                     style={styles.input}
                                                     value={editForm.titulo}
-                                                    onChangeText={(text) => setEditForm({...editForm, titulo: text})}
+                                                    onChangeText={(text) => setEditForm({ ...editForm, titulo: text })}
                                                     placeholder="Título del evento"
                                                 />
                                             </View>
@@ -886,7 +998,7 @@ const HealthCenter = () => {
                                                 <TextInput
                                                     style={styles.input}
                                                     value={editForm.hora}
-                                                    onChangeText={(text) => setEditForm({...editForm, hora: text})}
+                                                    onChangeText={(text) => setEditForm({ ...editForm, hora: text })}
                                                     placeholder="19:30"
                                                 />
                                             </View>
@@ -896,7 +1008,7 @@ const HealthCenter = () => {
                                                 <TextInput
                                                     style={[styles.input, styles.textArea]}
                                                     value={editForm.descripcion}
-                                                    onChangeText={(text) => setEditForm({...editForm, descripcion: text})}
+                                                    onChangeText={(text) => setEditForm({ ...editForm, descripcion: text })}
                                                     placeholder="Descripción del evento"
                                                     multiline
                                                     numberOfLines={4}
@@ -941,7 +1053,7 @@ const HealthCenter = () => {
                                 {!isEditMode ? (
                                     <View style={styles.modalButtonsRow}>
                                         {isEventEditable(selectedEvent) && (
-                                            <TouchableOpacity 
+                                            <TouchableOpacity
                                                 style={styles.modalEditButton}
                                                 onPress={handleEditToggle}
                                             >
@@ -949,8 +1061,8 @@ const HealthCenter = () => {
                                                 <Text style={styles.modalEditButtonText}>Editar</Text>
                                             </TouchableOpacity>
                                         )}
-                                        <TouchableOpacity 
-                                            style={[styles.modalCloseButton, !isEventEditable(selectedEvent) && {flex: 1}]}
+                                        <TouchableOpacity
+                                            style={[styles.modalCloseButton, !isEventEditable(selectedEvent) && { flex: 1 }]}
                                             onPress={() => setModalVisible(false)}
                                         >
                                             <Text style={styles.modalCloseButtonText}>Cerrar</Text>
@@ -958,14 +1070,14 @@ const HealthCenter = () => {
                                     </View>
                                 ) : (
                                     <View style={styles.modalButtonsRow}>
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             style={[styles.modalCancelButton]}
                                             onPress={() => setIsEditMode(false)}
                                             disabled={saving}
                                         >
                                             <Text style={styles.modalCancelButtonText}>Cancelar</Text>
                                         </TouchableOpacity>
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             style={[styles.modalSaveButton, saving && styles.modalButtonDisabled]}
                                             onPress={handleSave}
                                             disabled={saving}
@@ -997,7 +1109,7 @@ const HealthCenter = () => {
                 <View style={styles.mapModalContainer}>
                     <View style={styles.mapModalHeader}>
                         <Text style={styles.mapModalTitle}>Seleccionar Ubicación</Text>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             onPress={() => setMapModalVisible(false)}
                             style={styles.closeButton}
                         >
@@ -1054,7 +1166,7 @@ const HealthCenter = () => {
                             <>
                                 <View style={styles.modalHeader}>
                                     <Text style={styles.modalTitle}>Nuevo Evento</Text>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         onPress={() => setCreateModalVisible(false)}
                                         style={styles.closeButton}
                                     >
@@ -1081,7 +1193,7 @@ const HealthCenter = () => {
                                         <TextInput
                                             style={styles.input}
                                             value={createForm.titulo}
-                                            onChangeText={(text) => setCreateForm({...createForm, titulo: text})}
+                                            onChangeText={(text) => setCreateForm({ ...createForm, titulo: text })}
                                             placeholder="Título del evento"
                                         />
                                     </View>
@@ -1123,7 +1235,7 @@ const HealthCenter = () => {
                                         <TextInput
                                             style={styles.input}
                                             value={createForm.hora}
-                                            onChangeText={(text) => setCreateForm({...createForm, hora: text})}
+                                            onChangeText={(text) => setCreateForm({ ...createForm, hora: text })}
                                             placeholder="10:30"
                                         />
                                     </View>
@@ -1134,7 +1246,7 @@ const HealthCenter = () => {
                                         <TextInput
                                             style={[styles.input, styles.textArea]}
                                             value={createForm.descripcion}
-                                            onChangeText={(text) => setCreateForm({...createForm, descripcion: text})}
+                                            onChangeText={(text) => setCreateForm({ ...createForm, descripcion: text })}
                                             placeholder="Descripción del evento (opcional)"
                                             multiline
                                             numberOfLines={4}
@@ -1165,14 +1277,14 @@ const HealthCenter = () => {
                                 </ScrollView>
 
                                 <View style={styles.modalButtonsRow}>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={styles.modalCancelButton}
                                         onPress={() => setCreateModalVisible(false)}
                                         disabled={creating}
                                     >
                                         <Text style={styles.modalCancelButtonText}>Cancelar</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={[styles.modalSaveButton, creating && styles.modalButtonDisabled]}
                                         onPress={handleCreateEvent}
                                         disabled={creating}
@@ -1190,6 +1302,101 @@ const HealthCenter = () => {
                             </>
                         )}
                     </View>
+                </View>
+            </Modal>
+
+            {/* modal de todos los eventos */}
+            <Modal
+                visible={petEventsModalVisible}
+                animationType="slide"
+                transparent={false}
+                onRequestClose={() => {
+                    setPetEventsModalVisible(false);
+                    setSelectedPetForEvents(null);
+                }}
+            >
+                <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+                    {/* header del modal */}
+                    <View style={styles.allEventsModalHeader}>
+                        <TouchableOpacity
+                            onPress={() => {
+                                setPetEventsModalVisible(false);
+                                setSelectedPetForEvents(null);
+                            }}
+                            style={styles.closeButton}
+                        >
+                            <X size={24} color="#fff" />
+                        </TouchableOpacity>
+
+                        {selectedPetForEvents ? (
+                            // header para mascota específica
+                            <>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+                                    <PawPrint size={24} color="#fff" />
+                                    <Text style={styles.allEventsModalTitle}>{selectedPetForEvents.nombre}</Text>
+                                </View>
+                                <Text style={styles.allEventsModalSubtitle}>
+                                    {selectedPetForEvents.especie} • {calculateAge(selectedPetForEvents.fecha_nacimiento)}
+                                </Text>
+                                <Text style={[styles.allEventsModalSubtitle, { marginTop: 4 }]}>
+                                    {selectedPetForEvents.events.length} {selectedPetForEvents.events.length === 1 ? 'evento' : 'eventos'}
+                                </Text>
+                            </>
+                        ) : (
+                            // header para todos los eventos
+                            <>
+                                <Text style={styles.allEventsModalTitle}>Todos los Eventos</Text>
+                                <Text style={styles.allEventsModalSubtitle}>
+                                    {events.length} {events.length === 1 ? 'evento' : 'eventos'} en total
+                                </Text>
+                            </>
+                        )}
+                    </View>
+
+                    {/* contadores */}
+                    <View style={styles.petEventsCounters}>
+                        {(() => {
+                            // calcular contadores según filtro
+                            const eventsToCount = selectedPetForEvents ? selectedPetForEvents.events : events;
+                            const counts = {
+                                pendiente: eventsToCount.filter(e => e.estado.toLowerCase() === 'pendiente').length,
+                                completado: eventsToCount.filter(e => e.estado.toLowerCase() === 'completado').length,
+                                vencido: eventsToCount.filter(e => e.estado.toLowerCase() === 'vencido').length,
+                            };
+
+                            return (
+                                <>
+                                    <View style={[styles.petEventCounter, { backgroundColor: '#fef3c7' }]}>
+                                        <Text style={styles.petEventCounterNumber}>{counts.pendiente}</Text>
+                                        <Text style={[styles.petEventCounterLabel, { color: '#f59e0b' }]}>Pendiente</Text>
+                                    </View>
+                                    <View style={[styles.petEventCounter, { backgroundColor: '#d1fae5' }]}>
+                                        <Text style={styles.petEventCounterNumber}>{counts.completado}</Text>
+                                        <Text style={[styles.petEventCounterLabel, { color: '#10b981' }]}>Completado</Text>
+                                    </View>
+                                    <View style={[styles.petEventCounter, { backgroundColor: '#fee2e2' }]}>
+                                        <Text style={styles.petEventCounterNumber}>{counts.vencido}</Text>
+                                        <Text style={[styles.petEventCounterLabel, { color: '#ef4444' }]}>Vencido</Text>
+                                    </View>
+                                </>
+                            );
+                        })()}
+                    </View>
+
+                    {/* lista completa de eventos con scroll */}
+                    <ScrollView style={{ flex: 1, padding: 16 }}>
+                        {(() => {
+                            const eventsToShow = selectedPetForEvents ? selectedPetForEvents.events : events;
+
+                            if (eventsToShow.length === 0) {
+                                return <Text style={styles.emptyText}>
+                                    {selectedPetForEvents ? 'Esta mascota no tiene eventos' : 'No hay eventos registrados'}
+                                </Text>;
+                            }
+
+                            return eventsToShow.map(event => renderEventCard(event));
+                        })()}
+                    </ScrollView>
                 </View>
             </Modal>
         </ScreenWrapper>
@@ -1362,7 +1569,7 @@ const styles = StyleSheet.create({
     },
     addEventButton: {
         marginTop: 12,
-        backgroundColor: '#10b981',
+        backgroundColor: '#5bbbe8',
         paddingVertical: 10,
         paddingHorizontal: 16,
         borderRadius: 8,
@@ -1442,6 +1649,11 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         textTransform: 'uppercase',
         textAlign: 'center',
+    },
+    counterCardActive: {
+        borderWidth: 3,
+        borderColor: '#5bbbe8',
+        transform: [{ scale: 1.05 }],
     },
     modalOverlay: {
         flex: 1,
@@ -1552,7 +1764,7 @@ const styles = StyleSheet.create({
     },
     modalEditButton: {
         flex: 1,
-        backgroundColor: '#f59e0b',
+        backgroundColor: '#5bbbe8',
         padding: 16,
         borderRadius: 12,
         alignItems: 'center',
@@ -1567,7 +1779,7 @@ const styles = StyleSheet.create({
     },
     modalCloseButton: {
         flex: 1,
-        backgroundColor: '#3b82f6',
+        backgroundColor: '#5bbbe8',
         padding: 16,
         borderRadius: 12,
         alignItems: 'center',
@@ -1591,7 +1803,7 @@ const styles = StyleSheet.create({
     },
     modalSaveButton: {
         flex: 1,
-        backgroundColor: '#10b981',
+        backgroundColor: '#5bbbe8',
         padding: 16,
         borderRadius: 12,
         alignItems: 'center',
@@ -1793,6 +2005,75 @@ const styles = StyleSheet.create({
     },
     staticMap: {
         flex: 1,
+    },
+    // estilos para botón "ver todos los eventos"
+    viewAllEventsButton: {
+        backgroundColor: '#5bbbe8',
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 16,
+        marginHorizontal: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    viewAllEventsButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
+        marginRight: 8,
+    },
+    // estilos para modal de todos los eventos
+    allEventsModalHeader: {
+        backgroundColor: '#5bbbe8',
+        paddingTop: 50,
+        paddingBottom: 24,
+        paddingHorizontal: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    allEventsModalTitle: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: '#fff',
+        marginTop: 12,
+    },
+    allEventsModalSubtitle: {
+        fontSize: 16,
+        color: '#fff',
+        opacity: 0.9,
+        marginTop: 4,
+    },
+    petEventsCounters: {
+        flexDirection: 'row',
+        padding: 16,
+        gap: 12,
+    },
+    petEventCounter: {
+        flex: 1,
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    petEventCounterNumber: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: '#1f2937',
+        marginBottom: 4,
+    },
+    petEventCounterLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        textTransform: 'uppercase',
     },
 });
 
