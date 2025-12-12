@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Image, FlatList, Pressable, ActivityIndicator, Dimensions, ScrollView, RefreshControl, Alert, TextInput, Modal } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { Settings, Grid, Bookmark, Plus, Edit2, Trash2, X, Camera } from 'lucide-react-native';
 import { PostCard } from './PostCard';
 import { API_ENDPOINTS } from '../config/api';
@@ -22,6 +23,8 @@ const Perfil = () => {
   const [editingPet, setEditingPet] = useState(null);
   const [petForm, setPetForm] = useState({ nombre: '', especie: '', descripcion: '', fecha_nacimiento: '' });
   const [savingPet, setSavingPet] = useState(false);
+  const [speciesList, setSpeciesList] = useState([]);
+  const [loadingSpecies, setLoadingSpecies] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [showPostModal, setShowPostModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
@@ -117,7 +120,7 @@ const Perfil = () => {
         ? `${API_ENDPOINTS.PROFILE_PETS}/${editingPet.mascota_id}`
         : API_ENDPOINTS.PROFILE_PETS;
       
-      const method = editingPet ? 'PUT' : 'POST';
+      const method = editingPet ? 'PATCH' : 'POST';
       
       // Preparar el body según si es creación o actualización
       let requestBody;
@@ -137,7 +140,8 @@ const Perfil = () => {
           requestBody.descripcion = petForm.descripcion;
         }
         if (petForm.fecha_nacimiento !== (editingPet.fecha_nacimiento ? new Date(editingPet.fecha_nacimiento).toISOString().split('T')[0] : '')) {
-          requestBody.fecha_nacimiento = petForm.fecha_nacimiento ? new Date(petForm.fecha_nacimiento).toISOString() : null;
+          // Enviar solo YYYY-MM-DD para evitar problemas de zona horaria
+          requestBody.fecha_nacimiento = petForm.fecha_nacimiento ? petForm.fecha_nacimiento : null;
         }
         
         // Si no hay cambios, mostrar mensaje y cerrar modal
@@ -153,10 +157,12 @@ const Perfil = () => {
           nombre: petForm.nombre,
           especie: petForm.especie,
           descripcion: petForm.descripcion || null,
-          fecha_nacimiento: petForm.fecha_nacimiento ? new Date(petForm.fecha_nacimiento).toISOString() : null
+          // Enviar como YYYY-MM-DD (string) para que el backend lo parsee correctamente
+          fecha_nacimiento: petForm.fecha_nacimiento ? petForm.fecha_nacimiento : null
         };
       }
-      
+      console.log('Saving pet', { url, method, requestBody });
+
       const response = await fetch(url, {
         method,
         headers: {
@@ -165,36 +171,40 @@ const Perfil = () => {
         },
         body: JSON.stringify(requestBody)
       });
-
+      const contentType = response.headers.get('content-type') || '';
       if (response.ok) {
-        const result = await response.json();
-        setShowPetModal(false);
-        
-        // Actualizar mascotas localmente en lugar de recargar todo
-        if (editingPet) {
-          // Actualizar mascota existente
-          setPets(prevPets => 
-            prevPets.map(pet => 
-              pet.mascota_id === editingPet.mascota_id ? result.mascota : pet
-            )
-          );
-        } else {
-          // Agregar nueva mascota
-          setPets(prevPets => [...prevPets, result.mascota]);
+        let result = null;
+        try {
+          result = contentType.includes('application/json') ? await response.json() : null;
+        } catch (e) {
+          // Si no es JSON o fallo al parsear, registrar texto para investigar
+          const txt = await response.text().catch(() => '<no body>');
+          console.warn('Respuesta OK no-JSON al guardar mascota:', txt);
+          result = null;
         }
-        
-        // Resetear formulario
+        setShowPetModal(false);
+
+        if (editingPet) {
+          setPets(prevPets => prevPets.map(pet => pet.mascota_id === editingPet.mascota_id ? (result?.mascota || { ...editingPet, ...requestBody }) : pet));
+        } else {
+          setPets(prevPets => [...prevPets, result?.mascota || requestBody]);
+        }
+
         setPetForm({ nombre: '', especie: '', descripcion: '', fecha_nacimiento: '' });
         setEditingPet(null);
-        
-        // Mostrar mensaje de éxito
-        if (editingPet && Object.keys(requestBody).length > 0) {
-          const updatedFields = Object.keys(requestBody).join(', ');
-          console.log(`Campos actualizados: ${updatedFields}`);
-        }
+        if (editingPet && Object.keys(requestBody).length > 0) console.log('Campos actualizados:', Object.keys(requestBody).join(', '));
       } else {
-        const errorData = await response.json();
-        Alert.alert('Error', errorData.error || 'No se pudo guardar la mascota');
+        // Intentar leer JSON de error; si la respuesta NO es JSON, leer como texto y registrarlo
+        try {
+          const errBody = contentType.includes('application/json') ? await response.json() : await response.text();
+          console.error('Error saving pet, response body:', errBody);
+          const message = typeof errBody === 'string' ? errBody : (errBody.error || JSON.stringify(errBody));
+          Alert.alert('Error', message || 'No se pudo guardar la mascota');
+        } catch (e) {
+          const txt = await response.text().catch(() => 'Error desconocido');
+          console.error('Error saving pet, failed to read body:', e, txt);
+          Alert.alert('Error', txt);
+        }
       }
     } catch (error) {
       console.error('Error saving pet:', error);
@@ -203,6 +213,34 @@ const Perfil = () => {
       setSavingPet(false);
     }
   };
+
+  // Fetch species list when modal opens
+  useEffect(() => {
+    const loadSpecies = async () => {
+      try {
+        setLoadingSpecies(true);
+        const token = await AsyncStorage.getItem('token');
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(API_ENDPOINTS.MASCOTAS_ESPECIES, { headers });
+        if (res.ok) {
+          const json = await res.json();
+          // suponiendo que el backend devuelve { especies: ['Perro','Gato',...] } o array directo
+          const list = Array.isArray(json) ? json : (json.especies || []);
+          setSpeciesList(list);
+        } else {
+          console.log('No se pudo cargar especies', res.status);
+        }
+      } catch (e) {
+        console.error('Error cargando especies:', e);
+      } finally {
+        setLoadingSpecies(false);
+      }
+    };
+
+    if (showPetModal) loadSpecies();
+  }, [showPetModal]);
 
   const handleDeletePet = async (petId) => {
     Alert.alert(
@@ -583,10 +621,7 @@ const Perfil = () => {
                   <Text style={twrnc`text-xl font-bold`}>{pets.length}</Text>
                   <Text style={twrnc`text-gray-600 text-sm`}>Mascotas</Text>
                 </View>
-                <View style={twrnc`items-center`}>
-                  <Text style={twrnc`text-xl font-bold`}>{stats.followers}</Text>
-                  <Text style={twrnc`text-gray-600 text-sm`}>Seguidores</Text>
-                </View>
+                {/* Contador de seguidores eliminado según petición */}
               </View>
             </View>
 
@@ -698,12 +733,21 @@ const Perfil = () => {
 
               <View>
                 <Text style={twrnc`text-gray-700 font-medium mb-2`}>Especie *</Text>
-                <TextInput
-                  style={twrnc`border border-gray-300 rounded-lg px-3 py-2`}
-                  value={petForm.especie}
-                  onChangeText={(text) => setPetForm({ ...petForm, especie: text })}
-                  placeholder="Ej: Perro, Gato, Ave, etc."
-                />
+                {loadingSpecies ? (
+                  <ActivityIndicator size="small" color="#3b82f6" />
+                ) : (
+                  <View style={twrnc`border border-gray-300 rounded-lg overflow-hidden`}>
+                    <Picker
+                      selectedValue={petForm.especie}
+                      onValueChange={(val) => setPetForm({ ...petForm, especie: val })}
+                    >
+                      <Picker.Item label="Seleccione especie..." value="" />
+                      {speciesList.map((s, i) => (
+                        <Picker.Item key={i} label={typeof s === 'string' ? s : (s.nombre || s)} value={typeof s === 'string' ? s : (s.nombre || s)} />
+                      ))}
+                    </Picker>
+                  </View>
+                )}
               </View>
 
               <View>
