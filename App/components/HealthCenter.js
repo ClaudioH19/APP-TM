@@ -39,7 +39,8 @@ const HealthCenter = () => {
         fecha: '',
         hora: '',
         lat: '',
-        lon: ''
+        lon: '',
+        estado: 'pendiente'
     });
     const [creating, setCreating] = useState(false);
     const [isMapForCreate, setIsMapForCreate] = useState(false);
@@ -210,6 +211,24 @@ const HealthCenter = () => {
         }
     };
 
+    // detectar si la fecha del formulario es pasada
+    const isCreateFormDatePast = () => {
+        if (!createForm.fecha || !createForm.hora) return false;
+        const eventDateTime = new Date(`${createForm.fecha}T${createForm.hora}`);
+        return eventDateTime < new Date();
+    };
+
+    // obtener estados disponibles según si es pasada o futura
+    const getAvailableEstados = () => {
+        if (!Array.isArray(estados) || estados.length === 0) return [];
+
+        if (isCreateFormDatePast()) {
+            // evento pasado: solo completado, vencido, cancelado
+            return estados.filter(e => ['completado', 'vencido', 'cancelado'].includes(e.value));
+        }
+        // evento futuro: todos los estados
+        return estados;
+    };
 
     // Agrupa eventos por mascota
     const groupEventsByPet = () => {
@@ -511,6 +530,7 @@ const HealthCenter = () => {
                 hora: createForm.hora,
                 titulo: createForm.titulo.trim(),
                 descripcion: createForm.descripcion.trim() || undefined,
+                estado: createForm.estado, // incluir estado seleccionado
                 lat: createForm.lat ? parseFloat(createForm.lat) : null,
                 lon: createForm.lon ? parseFloat(createForm.lon) : null
             };
@@ -1284,7 +1304,6 @@ const HealthCenter = () => {
                                                 mode="date"
                                                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                                                 onChange={handleDateChange}
-                                                minimumDate={new Date()}
                                             />
                                         )}
                                     </View>
@@ -1299,6 +1318,38 @@ const HealthCenter = () => {
                                             placeholder="10:30"
                                         />
                                     </View>
+
+                                    {/* Estado - solo si hay fecha y hora seleccionadas */}
+                                    {createForm.fecha && createForm.hora && (
+                                        <View style={styles.modalSection}>
+                                            <Text style={styles.modalSectionTitle}>
+                                                Estado {isCreateFormDatePast() ? '(Evento pasado) *' : ''}
+                                            </Text>
+                                            <View style={styles.categoryItemsRow}>
+                                                {getAvailableEstados().map((estadoOption) => {
+                                                    const isSelected = createForm.estado === estadoOption.value;
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={estadoOption.value}
+                                                            style={[
+                                                                styles.categoryChip,
+                                                                isSelected && styles.categoryChipSelected
+                                                            ]}
+                                                            onPress={() => setCreateForm({ ...createForm, estado: estadoOption.value })}
+                                                            activeOpacity={0.8}
+                                                        >
+                                                            <Text style={[
+                                                                styles.categoryChipText,
+                                                                isSelected && styles.categoryChipTextSelected
+                                                            ]}>
+                                                                {estadoOption.label}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    );
+                                                })}
+                                            </View>
+                                        </View>
+                                    )}
 
                                     {/* Descripción */}
                                     <View style={styles.modalSection}>
@@ -1317,7 +1368,7 @@ const HealthCenter = () => {
                                     <View style={styles.modalSection}>
                                         <View style={styles.modalIconRow}>
                                             <MapPin size={18} color="#6b7280" />
-                                            <Text style={styles.modalSectionTitle}>Ubicación *</Text>
+                                            <Text style={styles.modalSectionTitle}>Ubicación</Text>
                                         </View>
                                         {createForm.lat && createForm.lon ? (
                                             <Text style={styles.locationText}>

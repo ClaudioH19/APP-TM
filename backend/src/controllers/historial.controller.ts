@@ -29,6 +29,17 @@ export class HistorialController {
       const when = parseFechaHora(req.body);
       if (!when || isNaN(+when)) return res.status(400).json({ message: 'Fecha/hora inválida' });
 
+      // validar que eventos pasados no puedan tener estado 'pendiente'
+      const now = new Date();
+      const isPastEvent = when < now;
+      const estado = String(req.body.estado || 'pendiente').toLowerCase();
+
+      if (isPastEvent && estado === 'pendiente') {
+        return res.status(400).json({
+          message: 'No se puede crear un evento pasado con estado "pendiente". Usa "completado", "vencido" o "cancelado".'
+        });
+      }
+
       const item = await crearHistorial({
         mascotaId,
         propietarioId: req.user.usuario_id,
@@ -88,6 +99,20 @@ export class HistorialController {
       if (!Number.isInteger(id)) return res.status(400).json({ message: 'ID inválido' });
 
       const fecha = parseFechaHora(req.body) || undefined;
+
+      // validar que eventos pasados no puedan tener estado 'pendiente'
+      if (fecha) {
+        const now = new Date();
+        const isPastEvent = fecha < now;
+        const estado = String(req.body.estado || '').toLowerCase();
+
+        if (isPastEvent && estado === 'pendiente') {
+          return res.status(400).json({
+            message: 'No se puede asignar estado "pendiente" a un evento pasado. Usa "completado", "vencido" o "cancelado".'
+          });
+        }
+      }
+
       const patch = {
         fecha,
         categoria: req.body.categoria,
