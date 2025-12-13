@@ -156,7 +156,14 @@ export class HistorialController {
   static async getEstados(req: any, res: Response) {
     try {
       if (!req.user) return res.status(401).json({ message: 'No autorizado' });
-      return res.json(ESTADOS_HISTORIAL);
+
+      // retornar estados con labels capitalizados
+      const estados = ESTADOS_HISTORIAL.map(estado => ({
+        value: estado,
+        label: estado.charAt(0).toUpperCase() + estado.slice(1)
+      }));
+
+      return res.json(estados);
     } catch (e: any) {
       return res.status(500).json({ message: e?.message || 'Error' });
     }

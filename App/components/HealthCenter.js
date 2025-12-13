@@ -44,6 +44,7 @@ const HealthCenter = () => {
     const [creating, setCreating] = useState(false);
     const [isMapForCreate, setIsMapForCreate] = useState(false);
     const [categories, setCategories] = useState([]);
+    const [estados, setEstados] = useState([]);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [editForm, setEditForm] = useState({
@@ -116,7 +117,9 @@ const HealthCenter = () => {
             await Promise.all([
                 fetchPets(token),
                 fetchEvents(token),
-                fetchEventCounts(token)
+                fetchEventCounts(token),
+                fetchCategories(),
+                fetchEstados()
             ]);
         } catch (err) {
             console.error('Error al cargar datos:', err);
@@ -190,6 +193,23 @@ const HealthCenter = () => {
             console.error('Error cargando categorías:', err);
         }
     };
+
+    const fetchEstados = async () => {
+        try {
+            const token = await AsyncStorage.getItem('token');
+            if (!token) return;
+
+            const response = await fetch(`${API_ENDPOINTS.EVENTS}/estados`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!response.ok) throw new Error('Error al obtener estados');
+            const data = await response.json();
+            setEstados(data);
+        } catch (err) {
+            console.error('Error cargando estados:', err);
+        }
+    };
+
 
     // Agrupa eventos por mascota
     const groupEventsByPet = () => {
@@ -270,16 +290,15 @@ const HealthCenter = () => {
         ).join(' ');
     };
 
-    // formatear estado para mostrar en UI
+    // formatear estado para mostrar en UI usando datos del backend
     const formatEstado = (estado) => {
-        const estadosMap = {
-            'pendiente': 'Pendiente',
-            'completado': 'Completado',
-            'vencido': 'Vencido',
-            'cancelado': 'Cancelado',
-            'proximo': 'Próximo'
-        };
-        return estadosMap[estado?.toLowerCase()] || estado;
+        if (!Array.isArray(estados) || estados.length === 0) {
+            // fallback si aún no se cargaron los estados
+            return estado?.charAt(0).toUpperCase() + estado?.slice(1) || estado;
+        }
+
+        const found = estados.find(e => e.value === estado?.toLowerCase());
+        return found ? found.label : (estado?.charAt(0).toUpperCase() + estado?.slice(1) || estado);
     };
 
     const formatDate = (dateString) => {
@@ -476,10 +495,6 @@ const HealthCenter = () => {
                 Alert.alert('Error', 'La hora es obligatoria');
                 return;
             }
-            if (!createForm.lat || !createForm.lon) {
-                Alert.alert('Error', 'Debes seleccionar una ubicación en el mapa');
-                return;
-            }
 
             setCreating(true);
             const token = await AsyncStorage.getItem('token');
@@ -496,8 +511,8 @@ const HealthCenter = () => {
                 hora: createForm.hora,
                 titulo: createForm.titulo.trim(),
                 descripcion: createForm.descripcion.trim() || undefined,
-                lat: parseFloat(createForm.lat),
-                lon: parseFloat(createForm.lon)
+                lat: createForm.lat ? parseFloat(createForm.lat) : null,
+                lon: createForm.lon ? parseFloat(createForm.lon) : null
             };
 
             const response = await fetch(`${API_ENDPOINTS.PETS}/${selectedPetForCreate.mascota_id}/historial`, {
@@ -588,6 +603,49 @@ const HealthCenter = () => {
             setSaving(false);
             Alert.alert('Error', err.message || 'No se pudo actualizar el evento');
         }
+    };
+
+    const handleDelete = async () => {
+        Alert.alert(
+            'Eliminar Evento',
+            '¿Estás seguro de que deseas eliminar este evento? Esta acción no se puede deshacer.',
+            [
+                {
+                    text: 'Cancelar',
+                    style: 'cancel'
+                },
+                {
+                    text: 'Eliminar',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const token = await AsyncStorage.getItem('token');
+                            if (!token) throw new Error('No autorizado');
+
+                            const response = await fetch(`${API_ENDPOINTS.EVENTS}/${selectedEvent.id}`, {
+                                method: 'DELETE',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                },
+                            });
+
+                            if (!response.ok) throw new Error('Error al eliminar el evento');
+
+                            setModalVisible(false);
+                            setIsEditMode(false);
+
+                            setTimeout(() => {
+                                Alert.alert('Éxito', 'Evento eliminado correctamente');
+                            }, 100);
+
+                            await fetchData();
+                        } catch (error) {
+                            Alert.alert('Error', error.message || 'No se pudo eliminar el evento');
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const handleToggleCompleted = async (eventItem, nextValue) => {
@@ -847,15 +905,6 @@ const HealthCenter = () => {
                                     <Text style={styles.modalTitle}>
                                         {isEditMode ? 'Editar Evento' : 'Detalle del Evento'}
                                     </Text>
-                                    <TouchableOpacity
-                                        onPress={() => {
-                                            setModalVisible(false);
-                                            setIsEditMode(false);
-                                        }}
-                                        style={styles.closeButton}
-                                    >
-                                        <X size={24} color="#6b7280" />
-                                    </TouchableOpacity>
                                 </View>
 
                                 <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
@@ -1051,23 +1100,34 @@ const HealthCenter = () => {
                                 </ScrollView>
 
                                 {!isEditMode ? (
-                                    <View style={styles.modalButtonsRow}>
-                                        {isEventEditable(selectedEvent) && (
+                                    <>
+                                        {/* botones de acción */}
+                                        <View style={styles.modalButtonsRow}>
                                             <TouchableOpacity
-                                                style={styles.modalEditButton}
-                                                onPress={handleEditToggle}
+                                                style={styles.modalDeleteButton}
+                                                onPress={handleDelete}
                                             >
-                                                <Edit2 size={18} color="#fff" />
-                                                <Text style={styles.modalEditButtonText}>Editar</Text>
+                                                <X size={18} color="#fff" />
+                                                <Text style={styles.modalDeleteButtonText}>Eliminar</Text>
                                             </TouchableOpacity>
-                                        )}
+                                            {isEventEditable(selectedEvent) && (
+                                                <TouchableOpacity
+                                                    style={styles.modalEditButton}
+                                                    onPress={handleEditToggle}
+                                                >
+                                                    <Edit2 size={18} color="#fff" />
+                                                    <Text style={styles.modalEditButtonText}>Editar</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+                                        {/* botón cerrar */}
                                         <TouchableOpacity
-                                            style={[styles.modalCloseButton, !isEventEditable(selectedEvent) && { flex: 1 }]}
+                                            style={styles.modalCloseButtonFull}
                                             onPress={() => setModalVisible(false)}
                                         >
                                             <Text style={styles.modalCloseButtonText}>Cerrar</Text>
                                         </TouchableOpacity>
-                                    </View>
+                                    </>
                                 ) : (
                                     <View style={styles.modalButtonsRow}>
                                         <TouchableOpacity
@@ -1776,6 +1836,28 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 16,
         fontWeight: '600',
+    },
+    modalDeleteButton: {
+        flex: 1,
+        backgroundColor: '#ef4444',
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    modalDeleteButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    modalCloseButtonFull: {
+        backgroundColor: '#5bbbe8',
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        marginTop: 12,
     },
     modalCloseButton: {
         flex: 1,
