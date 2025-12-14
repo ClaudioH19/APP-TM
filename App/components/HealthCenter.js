@@ -207,31 +207,59 @@ const HealthCenter = () => {
 
     const fetchCategories = async (token) => {
         try {
-            if (!token) return;
+            if (!token) {
+                console.log('No hay token para fetchCategories');
+                return;
+            }
 
             const response = await fetch(`${API_ENDPOINTS.EVENTS}/categorias`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
-            if (!response.ok) throw new Error('Error al obtener categorías');
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Error del servidor al obtener categorías:', response.status, errorText);
+                // No lanzar error, solo establecer categorías vacías
+                setCategories([]);
+                return;
+            }
+            
             const data = await response.json();
-            setCategories(data);
+            console.log('Categorías cargadas exitosamente:', data);
+            setCategories(Array.isArray(data) ? data : []);
         } catch (err) {
-            console.error('Error cargando categorías:', err);
+            console.error('Error cargando categorías:', err.message);
+            // No lanzar error, solo establecer categorías vacías
+            setCategories([]);
         }
     };
 
     const fetchEstados = async (token) => {
         try {
-            if (!token) return;
+            if (!token) {
+                console.log('No hay token para fetchEstados');
+                return;
+            }
 
             const response = await fetch(`${API_ENDPOINTS.EVENTS}/estados`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
-            if (!response.ok) throw new Error('Error al obtener estados');
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Error del servidor al obtener estados:', response.status, errorText);
+                // No lanzar error, solo establecer estados vacíos
+                setEstados([]);
+                return;
+            }
+            
             const data = await response.json();
-            setEstados(data);
+            console.log('Estados cargados exitosamente:', data);
+            setEstados(Array.isArray(data) ? data : []);
         } catch (err) {
-            console.error('Error cargando estados:', err);
+            console.error('Error cargando estados:', err.message);
+            // No lanzar error, solo establecer estados vacíos
+            setEstados([]);
         }
     };
 
