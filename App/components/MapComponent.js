@@ -40,12 +40,12 @@ const MapComponent = () => {
   const [loading, setLoading] = useState(true);
   const [interestPoints, setInterestPoints] = useState([]);
   const [loadingPoints, setLoadingPoints] = useState(false);
-  
+
   const [createMode, setCreateMode] = useState(false);
   const [centerCoordinate, setCenterCoordinate] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const isFocused = useIsFocused();
-  
+
   // Estados para el modal de detalles
   const [selectedPoint, setSelectedPoint] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -55,11 +55,11 @@ const MapComponent = () => {
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [currentStepCount, setCurrentStepCount] = useState(0);
   const [initialStepCount, setInitialStepCount] = useState(0);
-  
+
   // Refs para suscripciones (para limpieza segura al desmontar)
   const subscriptionRef = useRef(null);
   const locationSubscriptionRef = useRef(null);
-  
+
   const [showPetSelectionModal, setShowPetSelectionModal] = useState(false);
   const [myPets, setMyPets] = useState([]);
   const [selectedPet, setSelectedPet] = useState(null);
@@ -70,11 +70,11 @@ const MapComponent = () => {
     const R = 6371e3; // Radio de la tierra en metros
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2); 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const d = R * c;
     return d;
   };
@@ -83,11 +83,11 @@ const MapComponent = () => {
     getUserLocation();
     loadInterestPoints();
     fetchMyPets();
-    
+
     // Limpieza robusta al desmontar
     return () => {
       console.log('🧹 Limpiando recursos del mapa...');
-      
+
       // 1. Limpiar suscripción de podómetro/acelerómetro
       if (subscriptionRef.current) {
         try {
@@ -108,7 +108,7 @@ const MapComponent = () => {
       try {
         Accelerometer.removeAllListeners();
         Pedometer.removeAllListeners?.(); // Pedometer a veces no tiene este método en todas las versiones
-      } catch (e) {}
+      } catch (e) { }
     };
   }, []);
 
@@ -120,16 +120,16 @@ const MapComponent = () => {
       // Pero si queremos rastreo en background, NO debemos limpiar aquí.
       // Solo limpiamos si el usuario NO está rastreando activamente.
       if (!isTracking) {
-         if (locationSubscriptionRef.current) {
-            locationSubscriptionRef.current.remove();
-            locationSubscriptionRef.current = null;
-         }
+        if (locationSubscriptionRef.current) {
+          locationSubscriptionRef.current.remove();
+          locationSubscriptionRef.current = null;
+        }
       }
     } else {
-       // Al volver al foco, si no estamos rastreando, podríamos querer actualizar ubicación una vez
-       if (!isTracking && !locationSubscriptionRef.current) {
-          getUserLocation();
-       }
+      // Al volver al foco, si no estamos rastreando, podríamos querer actualizar ubicación una vez
+      if (!isTracking && !locationSubscriptionRef.current) {
+        getUserLocation();
+      }
     }
   }, [isFocused, isTracking]);
 
@@ -137,11 +137,11 @@ const MapComponent = () => {
     try {
       const token = await AsyncStorage.getItem('token');
       if (!token) return;
-      
+
       const response = await fetch(API_ENDPOINTS.PROFILE_PETS, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         // El backend devuelve un array directamente o un objeto con la propiedad mascotas
@@ -163,11 +163,11 @@ const MapComponent = () => {
       }
 
       console.log('🚀 Iniciando acelerómetro como fallback...');
-      setUsingPedometer(true); 
+      setUsingPedometer(true);
       usingPedometerRef.current = true;
-      
+
       Accelerometer.setUpdateInterval(100); // 10Hz
-      
+
       // Variables para suavizado (filtro paso bajo)
       let lastMag = 0;
       const alpha = 0.8; // Factor de suavizado
@@ -179,7 +179,7 @@ const MapComponent = () => {
         lastMag = magnitude;
 
         const now = Date.now();
-        
+
         // Umbral restaurado: 1.2G y debounce de 350ms
         if (magnitude > 1.2 && now - lastStepTime.current > 350) {
           setCurrentStepCount(prev => prev + 1);
@@ -206,7 +206,7 @@ const MapComponent = () => {
         const isPedometerAvailable = await Pedometer.isAvailableAsync();
         if (isPedometerAvailable) {
           const { status: pedometerStatus } = await Pedometer.getPermissionsAsync();
-          
+
           if (pedometerStatus === 'granted') {
             usePedometer = true;
           } else {
@@ -258,10 +258,10 @@ const MapComponent = () => {
         },
         (location) => {
           const { latitude, longitude } = location.coords;
-          
+
           setRouteCoordinates(prev => {
             const newCoords = [...prev, { latitude, longitude, timestamp: new Date() }];
-            
+
             // Si no usamos podómetro (ni nativo ni acelerómetro), estimar pasos basados en distancia
             // Usamos usingPedometerRef para asegurar el valor actual dentro del callback
             if (!usingPedometerRef.current && prev.length > 0) {
@@ -276,10 +276,10 @@ const MapComponent = () => {
                 setCurrentStepCount(c => c + stepsToAdd);
               }
             }
-            
+
             return newCoords;
           });
-          
+
           // Centrar mapa en la nueva ubicación
           if (mapRef.current) {
             mapRef.current.animateToRegion({
@@ -310,7 +310,7 @@ const MapComponent = () => {
       locationSubscriptionRef.current.remove();
       locationSubscriptionRef.current = null;
     }
-    
+
     // Detener acelerómetro explícitamente
     Accelerometer.removeAllListeners();
 
@@ -353,9 +353,9 @@ const MapComponent = () => {
         Alert.alert('Error', 'Error de conexión al guardar el recorrido.');
       }
     } else {
-        if(isTracking) Alert.alert('Aviso', 'No se registraron datos suficientes para guardar el recorrido.');
+      if (isTracking) Alert.alert('Aviso', 'No se registraron datos suficientes para guardar el recorrido.');
     }
-    
+
     // Limpiar estado
     setRouteCoordinates([]);
     setCurrentStepCount(0);
@@ -387,7 +387,7 @@ const MapComponent = () => {
   const getUserLocation = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      
+
       if (status !== 'granted') {
         Alert.alert(
           'Permiso denegado',
@@ -529,11 +529,11 @@ const MapComponent = () => {
         customMapStyle={mapStyle}
         initialRegion={region}
         showsPointsOfInterest={false}
-        showsUserLocation={isFocused}  
-        showsCompass={false}     
-        rotateEnabled={false}    
+        showsUserLocation={isFocused}
+        showsCompass={false}
+        rotateEnabled={false}
         onRegionChangeComplete={(newRegion) => {
-        
+
           // solo actualizar región en modo creación para capturar coordenada del centro
           if (createMode) {
             setRegion(newRegion);
@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 615,
     right: 3,
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#5bbbe8',
     borderRadius: 50,
     width: 56,
     height: 56,
@@ -742,8 +742,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
     elevation: 5,
   },
   actionButtons: {
@@ -761,23 +761,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
   },
   cancelButton: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
   },
   cancelButtonText: {
-    color: '#374151',
+    color: '#6b7280',
     fontSize: 16,
     fontWeight: '600',
   },
   confirmButton: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#5bbbe8',
   },
   confirmButtonText: {
     color: 'white',

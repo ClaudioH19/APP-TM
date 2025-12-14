@@ -66,7 +66,7 @@ const HealthCenter = () => {
     const [petEventsModalVisible, setPetEventsModalVisible] = useState(false);
     const [selectedPetForEvents, setSelectedPetForEvents] = useState(null); // null = todos los eventos, objeto = eventos de esa mascota
     const [selectedEstadoFilter, setSelectedEstadoFilter] = useState(null); // filtro por estado: null = sin filtro, string = filtrar por ese estado
-    
+
     // Ref para la región del mapa (evitar re-renders innecesarios)
     const mapRegionRef = useRef(mapRegion);
 
@@ -215,7 +215,7 @@ const HealthCenter = () => {
             const response = await fetch(`${API_ENDPOINTS.EVENTS}/categorias`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
-            
+
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('Error del servidor al obtener categorías:', response.status, errorText);
@@ -223,7 +223,7 @@ const HealthCenter = () => {
                 setCategories([]);
                 return;
             }
-            
+
             const data = await response.json();
             console.log('Categorías cargadas exitosamente:', data);
             setCategories(Array.isArray(data) ? data : []);
@@ -244,7 +244,7 @@ const HealthCenter = () => {
             const response = await fetch(`${API_ENDPOINTS.EVENTS}/estados`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
-            
+
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('Error del servidor al obtener estados:', response.status, errorText);
@@ -252,7 +252,7 @@ const HealthCenter = () => {
                 setEstados([]);
                 return;
             }
-            
+
             const data = await response.json();
             console.log('Estados cargados exitosamente:', data);
             setEstados(Array.isArray(data) ? data : []);
@@ -497,7 +497,7 @@ const HealthCenter = () => {
     const handleConfirmLocation = () => {
         // Usar la región actual del ref
         const currentRegion = mapRegionRef.current || mapRegion;
-        
+
         if (isMapForCreate) {
             setCreateForm({
                 ...createForm,
@@ -1285,7 +1285,7 @@ const HealthCenter = () => {
                             onPress={() => setMapModalVisible(false)}
                             style={styles.closeButton}
                         >
-                            <X size={24} color="#6b7280" />
+                            <X size={24} color="#ffffff" />
                         </TouchableOpacity>
                     </View>
 
@@ -2154,15 +2154,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#e5e7eb',
-        backgroundColor: 'white',
+        padding: 20,
+        backgroundColor: '#5bbbe8',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 3,
     },
     mapModalTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: '#1f2937',
+        color: '#ffffff',
     },
     mapContainer: {
         flex: 1,
@@ -2198,21 +2201,23 @@ const styles = StyleSheet.create({
     },
     mapCancelButton: {
         flex: 1,
-        backgroundColor: '#6b7280',
+        backgroundColor: '#fff',
+        borderWidth: 2,
+        borderColor: '#e5e7eb',
         padding: 14,
-        borderRadius: 12,
+        borderRadius: 16,
         alignItems: 'center',
     },
     mapCancelButtonText: {
-        color: 'white',
+        color: '#6b7280',
         fontSize: 16,
         fontWeight: '600',
     },
     mapConfirmButton: {
         flex: 1,
-        backgroundColor: '#10b981',
+        backgroundColor: '#5bbbe8',
         padding: 14,
-        borderRadius: 12,
+        borderRadius: 16,
         alignItems: 'center',
     },
     mapConfirmButtonText: {

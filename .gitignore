@@ -1,5 +1,6 @@
 # Ignorar credenciales de Google
 backend/credentials/
+backend/media_local/
 # Logs
 logs
 *.log
