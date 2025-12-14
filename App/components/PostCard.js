@@ -1,10 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Image, Pressable, ActivityIndicator } from 'react-native';
-import { Volume2, VolumeX } from 'lucide-react-native'; // comentado para evitar crasheos
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { View, Text, Image, Pressable, ActivityIndicator, AppState } from 'react-native';
+import { Volume2, VolumeX, Play, Pause } from 'lucide-react-native';
 import { Heart, MessageCircle } from 'lucide-react-native';
 import CommentsModal from './CommentsModal';
 import { API_ENDPOINTS } from '../config/api';
-import { Video } from 'expo-av'; // comentado para evitar crasheos
+import { Video } from 'expo-av';
 import { Svg, Circle, Text as SvgText } from 'react-native-svg';
 import { sendInteraccion, getUserInteractions } from '../services/interaccion_service';
 import { avatarCache } from '../services/avatarCache';
@@ -29,7 +29,7 @@ const DefaultAvatar = () => (
   </Svg>
 );
 
-export const PostCard = ({ post }) => {
+export const PostCard = ({ post, isVisible = true }) => {
   // Estados para las interacciones
   // Inicializar directamente con los datos optimizados del backend
   const [liked, setLiked] = useState(post.hasLiked || false);
@@ -51,10 +51,100 @@ export const PostCard = ({ post }) => {
   const [loadingLike, setLoadingLike] = useState(false);
   const [loadingInteractions, setLoadingInteractions] = useState(false);
 
-  // estados para video comentados para evitar crasheos
-   const videoRef = useRef(null);
-   const [muted, setMuted] = useState(true);
-   const toggleMute = () => setMuted(m => !m);
+  // Estados para video
+  const videoRef = useRef(null);
+  const [muted, setMuted] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [videoLoaded, setVideoLoaded] = useState(false);
+
+  // Función para pausar video de forma segura
+  const pauseVideo = useCallback(async () => {
+    try {
+      if (videoRef.current) {
+        await videoRef.current.pauseAsync();
+        setIsPlaying(false);
+      }
+    } catch (e) {
+      console.log('Error pausando video:', e);
+    }
+  }, []);
+
+  // Función para reproducir video de forma segura
+  const playVideo = useCallback(async () => {
+    try {
+      if (videoRef.current && videoLoaded) {
+        await videoRef.current.playAsync();
+        setIsPlaying(true);
+      }
+    } catch (e) {
+      console.log('Error reproduciendo video:', e);
+    }
+  }, [videoLoaded]);
+
+  // Toggle play/pause
+  const togglePlayPause = useCallback(async () => {
+    if (isPlaying) {
+      await pauseVideo();
+    } else {
+      await playVideo();
+    }
+  }, [isPlaying, pauseVideo, playVideo]);
+
+  // Toggle mute
+  const toggleMute = useCallback(async () => {
+    try {
+      if (videoRef.current) {
+        await videoRef.current.setIsMutedAsync(!muted);
+        setMuted(m => !m);
+      }
+    } catch (e) {
+      console.log('Error cambiando mute:', e);
+    }
+  }, [muted]);
+
+  // Pausar video cuando el componente no es visible o se desmonta
+  useEffect(() => {
+    if (!isVisible) {
+      pauseVideo();
+    }
+  }, [isVisible, pauseVideo]);
+
+  // Cleanup al desmontar - detener y descargar el video
+  useEffect(() => {
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.stopAsync().catch(() => {});
+        videoRef.current.unloadAsync().catch(() => {});
+      }
+    };
+  }, []);
+
+  // Pausar cuando la app va al background
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState !== 'active') {
+        pauseVideo();
+      }
+    });
+
+    return () => {
+      subscription?.remove();
+    };
+  }, [pauseVideo]);
+
+  // Callback cuando el video se carga
+  const onVideoLoad = useCallback((status) => {
+    if (status.isLoaded) {
+      setVideoLoaded(true);
+    }
+  }, []);
+
+  // Callback para actualizar estado de reproducción
+  const onPlaybackStatusUpdate = useCallback((status) => {
+    if (status.isLoaded) {
+      setIsPlaying(status.isPlaying);
+    }
+  }, []);
 
   // Estado para avatar
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -219,31 +309,71 @@ export const PostCard = ({ post }) => {
             const fileName = id.includes('.') || !ext ? id : `${id}.${ext}`;
             const uri = `${API_ENDPOINTS.MEDIA}/${fileName}`;
 
-            // reproducción de video comentada para evitar crasheos
+            // reproducción de video con controles mejorados
              if (isVideo) {
                return (
-                 <View style={{ width: '100%' }}>
+                 <Pressable 
+                   onPress={togglePlayPause}
+                   style={{ width: '100%' }}
+                   activeOpacity={0.9}
+                 >
                    <Video
                      ref={videoRef}
                      source={{ uri }}
                      style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' }}
                      resizeMode="cover"
                      isLooping={true}
-                     shouldPlay={true}
+                     shouldPlay={false}
                      isMuted={muted}
-                     useNativeControls={true}
+                     useNativeControls={false}
+                     onLoad={onVideoLoad}
+                     onPlaybackStatusUpdate={onPlaybackStatusUpdate}
+                     progressUpdateIntervalMillis={500}
                    />
+                   {/* Botón de play/pause central */}
+                   {!isPlaying && (
+                     <View 
+                       style={{ 
+                         position: 'absolute', 
+                         top: 0, 
+                         left: 0, 
+                         right: 0, 
+                         bottom: 0, 
+                         justifyContent: 'center', 
+                         alignItems: 'center',
+                         backgroundColor: 'rgba(0,0,0,0.2)'
+                       }}
+                       pointerEvents="none"
+                     >
+                       <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 40, padding: 16 }}>
+                         <Play size={32} color="#fff" fill="#fff" />
+                       </View>
+                     </View>
+                   )}
+                   {/* Botón de mute */}
                    <Pressable
-                     onPress={toggleMute}
-                     style={{ position: 'absolute', bottom: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 6 }}
+                     onPress={(e) => {
+                       e.stopPropagation?.();
+                       toggleMute();
+                     }}
+                     style={{ 
+                       position: 'absolute', 
+                       bottom: 12, 
+                       right: 12, 
+                       backgroundColor: 'rgba(0,0,0,0.6)', 
+                       borderRadius: 20, 
+                       padding: 8,
+                       zIndex: 10
+                     }}
+                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                    >
                      {muted ? (
-                       <VolumeX size={22} color="#fff" />
+                       <VolumeX size={20} color="#fff" />
                      ) : (
-                       <Volume2 size={22} color="#fff" />
+                       <Volume2 size={20} color="#fff" />
                      )}
                    </Pressable>
-                 </View>
+                 </Pressable>
                );
              }
 
