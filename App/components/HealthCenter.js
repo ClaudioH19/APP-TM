@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, FlatList, ActivityIndicator, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, Platform, Switch } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import MapView, { Marker } from 'react-native-maps';
+import * as Location from 'expo-location';
 import ScreenWrapper from './ScreenWrapper';
 import { API_ENDPOINTS } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -65,6 +66,31 @@ const HealthCenter = () => {
     const [petEventsModalVisible, setPetEventsModalVisible] = useState(false);
     const [selectedPetForEvents, setSelectedPetForEvents] = useState(null); // null = todos los eventos, objeto = eventos de esa mascota
     const [selectedEstadoFilter, setSelectedEstadoFilter] = useState(null); // filtro por estado: null = sin filtro, string = filtrar por ese estado
+    
+    // Ref para la región del mapa (evitar re-renders innecesarios)
+    const mapRegionRef = useRef(mapRegion);
+
+    const getUserLocation = async () => {
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permiso denegado', 'Se necesita permiso de ubicación para usar esta función');
+                return null;
+            }
+            const location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+            });
+            return {
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+            };
+        } catch (error) {
+            console.error('Error obteniendo ubicación:', error);
+            return null;
+        }
+    };
 
     const renderCategorySelector = (selectedValue, onSelect) => {
         if (!Array.isArray(categories) || categories.length === 0) {
@@ -119,8 +145,8 @@ const HealthCenter = () => {
                 fetchPets(token),
                 fetchEvents(token),
                 fetchEventCounts(token),
-                fetchCategories(),
-                fetchEstados()
+                fetchCategories(token),
+                fetchEstados(token)
             ]);
         } catch (err) {
             console.error('Error al cargar datos:', err);
@@ -179,9 +205,8 @@ const HealthCenter = () => {
         setEventCounts(data);
     };
 
-    const fetchCategories = async () => {
+    const fetchCategories = async (token) => {
         try {
-            const token = await AsyncStorage.getItem('token');
             if (!token) return;
 
             const response = await fetch(`${API_ENDPOINTS.EVENTS}/categorias`, {
@@ -195,9 +220,8 @@ const HealthCenter = () => {
         }
     };
 
-    const fetchEstados = async () => {
+    const fetchEstados = async (token) => {
         try {
-            const token = await AsyncStorage.getItem('token');
             if (!token) return;
 
             const response = await fetch(`${API_ENDPOINTS.EVENTS}/estados`, {
@@ -407,34 +431,56 @@ const HealthCenter = () => {
         setIsEditMode(!isEditMode);
     };
 
-    const handleOpenMapModal = () => {
-        const lat = parseFloat(editForm.lat) || -31.4201;
-        const lon = parseFloat(editForm.lon) || -64.1888;
-        setMapRegion({
-            latitude: lat,
-            longitude: lon,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-        });
+    const handleOpenMapModal = async () => {
+        let newRegion;
+        if (editForm.lat && editForm.lon) {
+            // Si el evento ya tiene coordenadas, usar esas
+            const lat = parseFloat(editForm.lat);
+            const lon = parseFloat(editForm.lon);
+            newRegion = {
+                latitude: lat,
+                longitude: lon,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+            };
+        } else {
+            // Si no tiene coordenadas, usar ubicación actual
+            newRegion = await getUserLocation();
+            if (!newRegion) {
+                // Si falla la ubicación, usar coordenadas por defecto
+                newRegion = {
+                    latitude: -31.4201,
+                    longitude: -64.1888,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                };
+            }
+        }
+        setMapRegion(newRegion);
+        mapRegionRef.current = newRegion;
         setMapModalVisible(true);
     };
 
     const handleMapRegionChange = (region) => {
-        setMapRegion(region);
+        // Solo actualizar la región en memoria, sin forzar re-render del MapView
+        mapRegionRef.current = region;
     };
 
     const handleConfirmLocation = () => {
+        // Usar la región actual del ref
+        const currentRegion = mapRegionRef.current || mapRegion;
+        
         if (isMapForCreate) {
             setCreateForm({
                 ...createForm,
-                lat: mapRegion.latitude.toFixed(6),
-                lon: mapRegion.longitude.toFixed(6)
+                lat: currentRegion.latitude.toFixed(6),
+                lon: currentRegion.longitude.toFixed(6)
             });
         } else {
             setEditForm({
                 ...editForm,
-                lat: mapRegion.latitude.toFixed(6),
-                lon: mapRegion.longitude.toFixed(6)
+                lat: currentRegion.latitude.toFixed(6),
+                lon: currentRegion.longitude.toFixed(6)
             });
         }
         setMapModalVisible(false);
@@ -482,15 +528,33 @@ const HealthCenter = () => {
         setCreateModalVisible(true);
     };
 
-    const handleOpenMapForCreate = () => {
-        const lat = parseFloat(createForm.lat) || -31.4201;
-        const lon = parseFloat(createForm.lon) || -64.1888;
-        setMapRegion({
-            latitude: lat,
-            longitude: lon,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-        });
+    const handleOpenMapForCreate = async () => {
+        let newRegion;
+        if (createForm.lat && createForm.lon) {
+            // Si ya hay coordenadas en el formulario, usar esas
+            const lat = parseFloat(createForm.lat);
+            const lon = parseFloat(createForm.lon);
+            newRegion = {
+                latitude: lat,
+                longitude: lon,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+            };
+        } else {
+            // Si no hay coordenadas, usar ubicación actual
+            newRegion = await getUserLocation();
+            if (!newRegion) {
+                // Si falla la ubicación, usar coordenadas por defecto
+                newRegion = {
+                    latitude: -31.4201,
+                    longitude: -64.1888,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                };
+            }
+        }
+        setMapRegion(newRegion);
+        mapRegionRef.current = newRegion;
         setIsMapForCreate(true);
         setMapModalVisible(true);
     };
@@ -852,7 +916,7 @@ const HealthCenter = () => {
                             {pets.length === 0 ? (
                                 <Text style={styles.emptyText}>No tienes mascotas registradas.</Text>
                             ) : (
-                                pets.map(pet => renderPetCard(pet))
+                                pets.map(pet => <View key={pet.mascota_id || pet.id}>{renderPetCard(pet)}</View>)
                             )}
                         </View>
 
@@ -887,7 +951,7 @@ const HealthCenter = () => {
 
                                 return (
                                     <>
-                                        {eventsToShow.map(event => renderEventCard(event))}
+                                        {eventsToShow.map(event => <View key={event.id}>{renderEventCard(event)}</View>)}
                                         {!selectedEstadoFilter && filteredEvents.length > 5 && (
                                             <TouchableOpacity
                                                 style={styles.viewAllEventsButton}
@@ -1200,7 +1264,7 @@ const HealthCenter = () => {
                     <View style={styles.mapContainer}>
                         <MapView
                             style={styles.map}
-                            region={mapRegion}
+                            initialRegion={mapRegion}
                             onRegionChangeComplete={handleMapRegionChange}
                         />
                         {/* Marcador fijo en el centro */}
@@ -1211,7 +1275,7 @@ const HealthCenter = () => {
 
                     <View style={styles.mapModalFooter}>
                         <Text style={styles.coordinatesInfo}>
-                            Lat: {mapRegion.latitude.toFixed(6)}, Lon: {mapRegion.longitude.toFixed(6)}
+                            Lat: {(mapRegionRef.current?.latitude || mapRegion.latitude).toFixed(6)}, Lon: {(mapRegionRef.current?.longitude || mapRegion.longitude).toFixed(6)}
                         </Text>
                         <View style={styles.mapModalButtons}>
                             <TouchableOpacity
@@ -1505,7 +1569,7 @@ const HealthCenter = () => {
                                 </Text>;
                             }
 
-                            return eventsToShow.map(event => renderEventCard(event));
+                            return eventsToShow.map(event => <View key={event.id}>{renderEventCard(event)}</View>);
                         })()}
                     </ScrollView>
                 </View>
