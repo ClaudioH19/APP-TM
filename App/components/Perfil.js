@@ -5,7 +5,7 @@ import { Settings, Grid, Bookmark, Plus, Edit2, Trash2, X, Camera } from 'lucide
 import { PostCard } from './PostCard';
 import { API_ENDPOINTS } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Video } from 'expo-av';
+// import { Video } from 'expo-av'; // comentado para evitar crasheos
 import * as ImagePicker from 'expo-image-picker';
 import { useCachedPosts } from '../hooks/useCachedPosts';
 import { avatarCache } from '../services/avatarCache';
@@ -16,7 +16,7 @@ const imageSize = width / 3;
 
 const Perfil = () => {
   const [user, setUser] = useState(null);
-  const [pets, setPets] = useState([]); 
+  const [pets, setPets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('grid');
   const [showPetModal, setShowPetModal] = useState(false);
@@ -29,7 +29,7 @@ const Perfil = () => {
   const [showPostModal, setShowPostModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  
+
   // Primero cargamos el usuario
   useEffect(() => {
     fetchUserProfile();
@@ -38,7 +38,7 @@ const Perfil = () => {
   const fetchUserProfile = async () => {
     try {
       setLoading(true);
-      
+
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         console.error('No token found');
@@ -62,7 +62,7 @@ const Perfil = () => {
         method: 'GET',
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (petsResponse.ok) {
         const petsData = await petsResponse.json();
         setPets(petsData.mascotas || []);
@@ -74,10 +74,10 @@ const Perfil = () => {
       setLoading(false);
     }
   };
-  
+
   // Usar hook de caché solo cuando user esté cargado
   const { posts, refreshing, refresh: refreshPosts } = useCachedPosts(user?.usuario_id);
-  
+
   const [stats, setStats] = useState({
     posts: 0,
     pets: 0,
@@ -110,13 +110,13 @@ const Perfil = () => {
 
   const handleSavePet = async () => {
     if (savingPet) return; // Prevenir múltiples clicks
-    
+
     try {
       setSavingPet(true);
       const token = await AsyncStorage.getItem('token');
       if (!token) return;
 
-      const url = editingPet 
+      const url = editingPet
         ? `${API_ENDPOINTS.PROFILE_PETS}/${editingPet.mascota_id}`
         : API_ENDPOINTS.PROFILE_PETS;
       
@@ -124,11 +124,11 @@ const Perfil = () => {
       
       // Preparar el body según si es creación o actualización
       let requestBody;
-      
+
       if (editingPet) {
         // Para actualización, solo enviar campos que han cambiado
         requestBody = {};
-        
+
         // Comparar cada campo con el valor original
         if (petForm.nombre !== (editingPet.nombre || '')) {
           requestBody.nombre = petForm.nombre;
@@ -143,7 +143,7 @@ const Perfil = () => {
           // Enviar solo YYYY-MM-DD para evitar problemas de zona horaria
           requestBody.fecha_nacimiento = petForm.fecha_nacimiento ? petForm.fecha_nacimiento : null;
         }
-        
+
         // Si no hay cambios, mostrar mensaje y cerrar modal
         if (Object.keys(requestBody).length === 0) {
           Alert.alert('Sin cambios', 'No se detectaron cambios en la información de la mascota.');
@@ -331,7 +331,7 @@ const Perfil = () => {
         const data = await response.json();
         // Invalidar caché de avatar para este usuario
         avatarCache.invalidate(user.usuario_id);
-        
+
         // Actualizar el usuario con el nuevo avatar
         setUser(prevUser => ({
           ...prevUser,
@@ -376,7 +376,7 @@ const Perfil = () => {
               if (response.ok) {
                 // Invalidar caché de avatar para este usuario
                 avatarCache.invalidate(user.usuario_id);
-                
+
                 setUser(prevUser => ({
                   ...prevUser,
                   avatar: null,
@@ -406,9 +406,9 @@ const Perfil = () => {
 
     if (!id) {
       return (
-        <View style={{ 
-          width: imageSize - 2, 
-          height: imageSize - 2, 
+        <View style={{
+          width: imageSize - 2,
+          height: imageSize - 2,
           margin: 1,
           backgroundColor: '#e5e7eb',
           justifyContent: 'center',
@@ -459,10 +459,10 @@ const Perfil = () => {
     const isVideo = (mime && mime.startsWith('video')) || videoExts.includes(ext);
 
     return (
-      <Pressable 
-        style={{ 
-          width: imageSize - 2, 
-          height: imageSize - 2, 
+      <Pressable
+        style={{
+          width: imageSize - 2,
+          height: imageSize - 2,
           margin: 1,
           backgroundColor: '#000'
         }}
@@ -472,7 +472,8 @@ const Perfil = () => {
         }}
       >
         <View style={{ width: '100%', height: '100%', position: 'relative' }}>
-          {isVideo ? (
+          {/* video comentado para evitar crasheos */}
+          {/* {isVideo ? (
             <Video
               source={{ uri: mediaUrl }}
               style={{ width: '100%', height: '100%' }}
@@ -485,18 +486,18 @@ const Perfil = () => {
                 console.log('Error cargando video:', mediaUrl, error);
               }}
             />
-          ) : (
-            <Image 
-              source={{ uri: mediaUrl }}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-              onError={(error) => {
-                console.log('Error cargando imagen:', mediaUrl, error.nativeEvent.error);
-              }}
-            />
-          )}
-          {isVideo && (
-            <View style={{ 
+          ) : ( */}
+          <Image
+            source={{ uri: mediaUrl }}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode="cover"
+            onError={(error) => {
+              console.log('Error cargando imagen:', mediaUrl, error.nativeEvent.error);
+            }}
+          />
+          {/* )} */}
+          {/* {isVideo && ( */}
+          {/* <View style={{ 
               position: 'absolute', 
               top: 8, 
               right: 8, 
@@ -505,8 +506,8 @@ const Perfil = () => {
               padding: 4 
             }}>
               <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>▶</Text>
-            </View>
-          )}
+            </View> */}
+          {/* )} */}
         </View>
       </Pressable>
     );
@@ -569,7 +570,7 @@ const Perfil = () => {
         columnWrapperStyle={activeTab === 'grid' ? { justifyContent: 'flex-start' } : null}
         renderItem={
           activeTab === 'pets' ? renderPetItem :
-          activeTab === 'grid' ? renderGridItem : renderListItem
+            activeTab === 'grid' ? renderGridItem : renderListItem
         }
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -582,7 +583,7 @@ const Perfil = () => {
               <Pressable style={twrnc`mr-6`} onPress={() => setShowAvatarModal(true)}>
                 <View style={twrnc`w-20 h-20 rounded-full bg-gray-300 items-center justify-center overflow-hidden`}>
                   {user.avatar && user.avatar.data ? (
-                    <Image 
+                    <Image
                       source={{ uri: `data:${user.avatar.mimeType};base64,${user.avatar.data}` }}
                       style={{ width: '100%', height: '100%' }}
                       resizeMode="cover"
@@ -594,15 +595,15 @@ const Perfil = () => {
                   )}
                 </View>
                 {/* Indicador de cámara */}
-                <View style={{ 
-                  position: 'absolute', 
-                  bottom: 0, 
-                  right: 0, 
-                  backgroundColor: '#3b82f6', 
-                  borderRadius: 12, 
-                  width: 24, 
-                  height: 24, 
-                  justifyContent: 'center', 
+                <View style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  backgroundColor: '#3b82f6',
+                  borderRadius: 12,
+                  width: 24,
+                  height: 24,
+                  justifyContent: 'center',
                   alignItems: 'center',
                   borderWidth: 2,
                   borderColor: 'white'
@@ -641,26 +642,26 @@ const Perfil = () => {
 
             {/* Tabs */}
             <View style={twrnc`flex-row border-t border-gray-300`}>
-              <Pressable 
+              <Pressable
                 style={twrnc`flex-1 py-3 items-center border-t-2 ${activeTab === 'grid' ? 'border-black' : 'border-transparent'}`}
                 onPress={() => setActiveTab('grid')}
               >
                 <Grid size={24} color={activeTab === 'grid' ? '#000' : '#9ca3af'} />
               </Pressable>
-              <Pressable 
+              <Pressable
                 style={twrnc`flex-1 py-3 items-center border-t-2 ${activeTab === 'list' ? 'border-black' : 'border-transparent'}`}
                 onPress={() => setActiveTab('list')}
               >
                 <Bookmark size={24} color={activeTab === 'list' ? '#000' : '#9ca3af'} />
               </Pressable>
-              <Pressable 
+              <Pressable
                 style={twrnc`flex-1 py-3 items-center border-t-2 ${activeTab === 'pets' ? 'border-black' : 'border-transparent'}`}
                 onPress={() => setActiveTab('pets')}
               >
                 <Text style={twrnc`font-bold ${activeTab === 'pets' ? 'text-black' : 'text-gray-400'}`}>🐾</Text>
               </Pressable>
             </View>
-            
+
             {/* Header para mascotas con botón agregar */}
             {activeTab === 'pets' && (
               <View style={twrnc`px-4 py-3 bg-gray-50 border-b border-gray-200 flex-row justify-between items-center`}>
@@ -699,7 +700,7 @@ const Perfil = () => {
           activeTab === 'pets' && twrnc`pb-6` // Padding bottom para mascotas
         ]}
       />
-      
+
       {/* Botón flotante eliminado - ahora está en el header */}
 
       {/* Modal para agregar/editar mascota */}
@@ -804,14 +805,14 @@ const Perfil = () => {
           setSelectedPost(null);
         }}
       >
-        <Pressable 
+        <Pressable
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 20 }}
           onPress={() => {
             setShowPostModal(false);
             setSelectedPost(null);
           }}
         >
-          <Pressable 
+          <Pressable
             style={{ backgroundColor: 'white', borderRadius: 12, maxHeight: '90%', overflow: 'hidden' }}
             onPress={(e) => e.stopPropagation()}
           >
@@ -828,7 +829,7 @@ const Perfil = () => {
 
             {/* Contenido del post con ScrollView */}
             {selectedPost && (
-              <ScrollView 
+              <ScrollView
                 style={{ maxHeight: 600 }}
                 showsVerticalScrollIndicator={true}
               >
@@ -846,11 +847,11 @@ const Perfil = () => {
         transparent={true}
         onRequestClose={() => setShowAvatarModal(false)}
       >
-        <Pressable 
+        <Pressable
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
           onPress={() => setShowAvatarModal(false)}
         >
-          <Pressable 
+          <Pressable
             style={{ backgroundColor: 'white', borderRadius: 12, width: '80%', padding: 20 }}
             onPress={(e) => e.stopPropagation()}
           >

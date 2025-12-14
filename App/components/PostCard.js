@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Image, Pressable, ActivityIndicator } from 'react-native';
-import { Volume2, VolumeX } from 'lucide-react-native';
+// import { Volume2, VolumeX } from 'lucide-react-native'; // comentado para evitar crasheos
 import { Heart, MessageCircle } from 'lucide-react-native';
 import CommentsModal from './CommentsModal';
 import { API_ENDPOINTS } from '../config/api';
-import { Video } from 'expo-av';
+// import { Video } from 'expo-av'; // comentado para evitar crasheos
 import { Svg, Circle, Text as SvgText } from 'react-native-svg';
 import { sendInteraccion, getUserInteractions } from '../services/interaccion_service';
 import { avatarCache } from '../services/avatarCache';
@@ -34,19 +34,19 @@ export const PostCard = ({ post }) => {
   // Inicializar directamente con los datos optimizados del backend
   const [liked, setLiked] = useState(post.hasLiked || false);
   const [commented, setCommented] = useState(post.hasCommented || false);
-  
+
   // Estados para los contadores
   const [likeCount, setLikeCount] = useState(post.contador_likes ?? 0);
   const [commentCount, setCommentCount] = useState(post.contador_comentarios ?? 0);
-  
+
   // Estados para loading
   const [loadingLike, setLoadingLike] = useState(false);
   const [loadingInteractions, setLoadingInteractions] = useState(false);
-  
-  // Estados para video
-  const videoRef = useRef(null);
-  const [muted, setMuted] = useState(true);
-  const toggleMute = () => setMuted(m => !m);
+
+  // estados para video comentados para evitar crasheos
+  // const videoRef = useRef(null);
+  // const [muted, setMuted] = useState(true);
+  // const toggleMute = () => setMuted(m => !m);
 
   // Estado para avatar
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -74,7 +74,7 @@ export const PostCard = ({ post }) => {
   // Cargar avatar al montar el componente
   useEffect(() => {
     // Ya NO cargamos interacciones aquí (optimización masiva)
-    
+
     // Cargar avatar si existe el usuario
     if (post.usuario?.usuario_id) {
       const baseUrl = API_ENDPOINTS.USER_AVATAR(post.usuario.usuario_id);
@@ -88,17 +88,17 @@ export const PostCard = ({ post }) => {
     if (loadingLike) return;
     console.log('Enviando like para post:', post.id);
     setLoadingLike(true);
-    
+
     // Actualizar el UI optimistamente
     const newLiked = !liked;
     setLiked(newLiked);
     const previousLikeCount = likeCount;
     setLikeCount(c => newLiked ? c + 1 : c - 1);
-    
+
     try {
       const result = await sendInteraccion(post.id, 1);
       console.log('Respuesta del servidor:', result);
-      
+
       if (result.success && result.counters) {
         // Usar los contadores reales del backend
         setLikeCount(result.counters.likes);
@@ -119,7 +119,7 @@ export const PostCard = ({ post }) => {
   };
 
 
-  
+
 
 
   return (
@@ -214,32 +214,33 @@ export const PostCard = ({ post }) => {
             const fileName = id.includes('.') || !ext ? id : `${id}.${ext}`;
             const uri = `${API_ENDPOINTS.MEDIA}/${fileName}`;
 
-            if (isVideo) {
-              return (
-                <View style={{ width: '100%' }}>
-                  <Video
-                    ref={videoRef}
-                    source={{ uri }}
-                    style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' }}
-                    resizeMode="cover"
-                    isLooping={true}
-                    shouldPlay={true}
-                    isMuted={muted}
-                    useNativeControls={true}
-                  />
-                  <Pressable
-                    onPress={toggleMute}
-                    style={{ position: 'absolute', bottom: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 6 }}
-                  >
-                    {muted ? (
-                      <VolumeX size={22} color="#fff" />
-                    ) : (
-                      <Volume2 size={22} color="#fff" />
-                    )}
-                  </Pressable>
-                </View>
-              );
-            }
+            // reproducción de video comentada para evitar crasheos
+            // if (isVideo) {
+            //   return (
+            //     <View style={{ width: '100%' }}>
+            //       <Video
+            //         ref={videoRef}
+            //         source={{ uri }}
+            //         style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' }}
+            //         resizeMode="cover"
+            //         isLooping={true}
+            //         shouldPlay={true}
+            //         isMuted={muted}
+            //         useNativeControls={true}
+            //       />
+            //       <Pressable
+            //         onPress={toggleMute}
+            //         style={{ position: 'absolute', bottom: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 6 }}
+            //       >
+            //         {muted ? (
+            //           <VolumeX size={22} color="#fff" />
+            //         ) : (
+            //           <Volume2 size={22} color="#fff" />
+            //         )}
+            //       </Pressable>
+            //     </View>
+            //   );
+            // }
 
             // fallback to image
             return (
@@ -271,18 +272,18 @@ export const PostCard = ({ post }) => {
         </Pressable>
 
         <Pressable onPress={openComments} className="flex-row items-center gap-1.5" disabled={loadingInteractions}>
-          <MessageCircle 
-            size={20} 
+          <MessageCircle
+            size={20}
             color={commented ? '#3b82f6' : '#374151'}
             fill={commented ? '#3b82f6' : 'transparent'}
           />
           <Text className="text-sm text-gray-700">{commentCount}</Text>
         </Pressable>
       </View>
-      <CommentsModal 
-        postId={post.id} 
-        visible={commentsVisible} 
-        onClose={closeComments} 
+      <CommentsModal
+        postId={post.id}
+        visible={commentsVisible}
+        onClose={closeComments}
         onCommentCreated={refreshCommentCount}
       />
     </View>

@@ -33,7 +33,12 @@ export default function CommentsModal({ postId, visible, onClose, onCommentCreat
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={tw`flex-1 justify-end bg-black/40`}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={tw`bg-white rounded-t-2xl min-h-4/5`}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+          style={tw`bg-white rounded-t-2xl`}
+          keyboardVerticalOffset={0}
+        >
+          {/* Header */}
           <View style={tw`flex-row items-center justify-between px-4 py-3 border-b border-gray-200`}>
             <Text style={tw`text-lg font-semibold`}>Comentarios</Text>
             <Pressable onPress={onClose} style={tw`p-1`}>
@@ -41,6 +46,7 @@ export default function CommentsModal({ postId, visible, onClose, onCommentCreat
             </Pressable>
           </View>
 
+          {/* Content */}
           {loading ? (
             <View style={tw`py-8 items-center`}>
               <ActivityIndicator size="large" color="#5bbbe8" />
@@ -63,7 +69,8 @@ export default function CommentsModal({ postId, visible, onClose, onCommentCreat
             />
           )}
 
-          <View style={tw`px-4 py-3 border-t border-gray-200 flex-row items-center`}>
+          {/* Input fijo al fondo */}
+          <View style={tw`px-4 py-3 border-t border-gray-200 flex-row items-center bg-white`}>
             <TextInput
               value={text}
               onChangeText={setText}

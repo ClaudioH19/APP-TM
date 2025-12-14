@@ -9,6 +9,7 @@ import Register from './components/Register';
 import Header from './components/Header';
 import CreatePost from './components/CreatePost';
 import MapComponent from './components/MapComponent';
+import HealthCenter from './components/HealthCenter';
 import Perfil from './components/Perfil';
 import ScreenWrapper from './components/ScreenWrapper';
 import "./global.css";
@@ -79,6 +80,7 @@ export default function App() {
         <Stack.Screen name="Register" component={Register} options={{ title: 'Registro' }} />
         <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
         <Stack.Screen name="CreatePost" component={CreatePost} options={{ title: 'Crear Publicación' }} />
+        <Stack.Screen name="Health" component={HealthCenter} options={{ headerShown: false }} />
         <Stack.Screen name="Map" component={MapScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
       </Stack.Navigator>

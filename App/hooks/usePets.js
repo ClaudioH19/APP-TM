@@ -44,7 +44,8 @@ const usePets = (apiUrl) => {
         
         const data = await response.json();
 
-        setPets(data);
+        // Si la respuesta tiene el formato { mascotas: [...] }, extraer el array
+        setPets(Array.isArray(data) ? data : (data.mascotas || []));
       } catch (err) {
 
         setError(err.message);
