@@ -22,7 +22,6 @@
         "NSMicrophoneUsageDescription": "Esta app necesita acceso al micrófono para grabar vídeos.",
         "NSMotionUsageDescription": "Esta app necesita acceso al podómetro para contar tus pasos."
       }
-      
     },
     "android": {
       "adaptiveIcon": {
@@ -34,11 +33,17 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.tuempresa.app"
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "7cac9693-c8c8-4f41-9de2-c827d44b5953"
+      }
     }
   }
 }

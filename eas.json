@@ -1,5 +1,12 @@
 {
   "cli": {
     "projectRoot": "App"
+  },
+  "build": {
+    "production": {
+      "android": {
+        "buildType": "apk"
+      }
+    }
   }
 }
