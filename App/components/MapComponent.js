@@ -564,7 +564,7 @@ const MapComponent = () => {
 
       {/* Panel de control de recorrido */}
       {isTracking && (
-        <View style={twrnc`absolute top-12 left-4 right-4 bg-white rounded-xl p-4 shadow-lg flex-row justify-between items-center`}>
+        <View style={twrnc`absolute bottom-12 left-4 right-4 bg-white rounded-xl p-4 shadow-lg flex-row justify-between items-center`}>
           <View>
             <Text style={twrnc`text-gray-500 text-xs font-bold uppercase`}>Paseando a</Text>
             <Text style={twrnc`text-lg font-bold text-gray-800`}>{selectedPet?.nombre}</Text>
