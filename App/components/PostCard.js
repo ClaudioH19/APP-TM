@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Image, Pressable, ActivityIndicator } from 'react-native';
-// import { Volume2, VolumeX } from 'lucide-react-native'; // comentado para evitar crasheos
+import { Volume2, VolumeX } from 'lucide-react-native'; // comentado para evitar crasheos
 import { Heart, MessageCircle } from 'lucide-react-native';
 import CommentsModal from './CommentsModal';
 import { API_ENDPOINTS } from '../config/api';
-// import { Video } from 'expo-av'; // comentado para evitar crasheos
+import { Video } from 'expo-av'; // comentado para evitar crasheos
 import { Svg, Circle, Text as SvgText } from 'react-native-svg';
 import { sendInteraccion, getUserInteractions } from '../services/interaccion_service';
 import { avatarCache } from '../services/avatarCache';
@@ -52,9 +52,9 @@ export const PostCard = ({ post }) => {
   const [loadingInteractions, setLoadingInteractions] = useState(false);
 
   // estados para video comentados para evitar crasheos
-  // const videoRef = useRef(null);
-  // const [muted, setMuted] = useState(true);
-  // const toggleMute = () => setMuted(m => !m);
+   const videoRef = useRef(null);
+   const [muted, setMuted] = useState(true);
+   const toggleMute = () => setMuted(m => !m);
 
   // Estado para avatar
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -220,32 +220,32 @@ export const PostCard = ({ post }) => {
             const uri = `${API_ENDPOINTS.MEDIA}/${fileName}`;
 
             // reproducción de video comentada para evitar crasheos
-            // if (isVideo) {
-            //   return (
-            //     <View style={{ width: '100%' }}>
-            //       <Video
-            //         ref={videoRef}
-            //         source={{ uri }}
-            //         style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' }}
-            //         resizeMode="cover"
-            //         isLooping={true}
-            //         shouldPlay={true}
-            //         isMuted={muted}
-            //         useNativeControls={true}
-            //       />
-            //       <Pressable
-            //         onPress={toggleMute}
-            //         style={{ position: 'absolute', bottom: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 6 }}
-            //       >
-            //         {muted ? (
-            //           <VolumeX size={22} color="#fff" />
-            //         ) : (
-            //           <Volume2 size={22} color="#fff" />
-            //         )}
-            //       </Pressable>
-            //     </View>
-            //   );
-            // }
+             if (isVideo) {
+               return (
+                 <View style={{ width: '100%' }}>
+                   <Video
+                     ref={videoRef}
+                     source={{ uri }}
+                     style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' }}
+                     resizeMode="cover"
+                     isLooping={true}
+                     shouldPlay={true}
+                     isMuted={muted}
+                     useNativeControls={true}
+                   />
+                   <Pressable
+                     onPress={toggleMute}
+                     style={{ position: 'absolute', bottom: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 6 }}
+                   >
+                     {muted ? (
+                       <VolumeX size={22} color="#fff" />
+                     ) : (
+                       <Volume2 size={22} color="#fff" />
+                     )}
+                   </Pressable>
+                 </View>
+               );
+             }
 
             // fallback to image
             return (

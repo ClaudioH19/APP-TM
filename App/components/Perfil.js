@@ -5,7 +5,7 @@ import { Settings, Grid, Bookmark, Plus, Edit2, Trash2, X, Camera } from 'lucide
 import { PostCard } from './PostCard';
 import { API_ENDPOINTS } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// import { Video } from 'expo-av'; // comentado para evitar crasheos
+ import { Video } from 'expo-av'; // comentado para evitar crasheos
 import * as ImagePicker from 'expo-image-picker';
 import { useCachedPosts } from '../hooks/useCachedPosts';
 import { avatarCache } from '../services/avatarCache';
@@ -501,7 +501,7 @@ const Perfil = () => {
       >
         <View style={{ width: '100%', height: '100%', position: 'relative' }}>
           {/* video comentado para evitar crasheos */}
-          {/* {isVideo ? (
+           {isVideo ? (
             <Video
               source={{ uri: mediaUrl }}
               style={{ width: '100%', height: '100%' }}
@@ -514,7 +514,7 @@ const Perfil = () => {
                 console.log('Error cargando video:', mediaUrl, error);
               }}
             />
-          ) : ( */}
+          ) : ( 
           <Image
             source={{ uri: mediaUrl }}
             style={{ width: '100%', height: '100%' }}
@@ -523,9 +523,9 @@ const Perfil = () => {
               console.log('Error cargando imagen:', mediaUrl, error.nativeEvent.error);
             }}
           />
-          {/* )} */}
-          {/* {isVideo && ( */}
-          {/* <View style={{ 
+           )} 
+           {isVideo && ( 
+           <View style={{ 
               position: 'absolute', 
               top: 8, 
               right: 8, 
@@ -534,8 +534,8 @@ const Perfil = () => {
               padding: 4 
             }}>
               <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>▶</Text>
-            </View> */}
-          {/* )} */}
+            </View> 
+           )} 
         </View>
       </Pressable>
     );
