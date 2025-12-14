@@ -287,13 +287,15 @@ const Perfil = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'], // Nueva API (reemplaza MediaTypeOptions.Images)
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets[0]) {
+        // Pequeño delay para asegurar que la imagen esté lista
+        await new Promise(resolve => setTimeout(resolve, 100));
         await uploadAvatar(result.assets[0].uri);
       }
     } catch (error) {
@@ -302,33 +304,51 @@ const Perfil = () => {
     }
   };
 
-  const uploadAvatar = async (uri) => {
+  const uploadAvatar = async (uri, retryCount = 0) => {
     try {
       setUploadingAvatar(true);
       const token = await AsyncStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        setUploadingAvatar(false);
+        return;
+      }
+
+      console.log('Subiendo avatar desde URI:', uri);
 
       const formData = new FormData();
-      const filename = uri.split('/').pop();
+      const filename = uri.split('/').pop() || 'avatar.jpg';
       const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      let type = 'image/jpeg';
+      if (match) {
+        const ext = match[1].toLowerCase();
+        if (ext === 'png') type = 'image/png';
+        else if (ext === 'gif') type = 'image/gif';
+        else if (ext === 'webp') type = 'image/webp';
+      }
 
+      // React Native requiere este formato específico para FormData con archivos
       formData.append('avatar', {
-        uri,
+        uri: uri,
         name: filename,
-        type
+        type: type
       });
+
+      console.log('Enviando request a:', API_ENDPOINTS.AVATAR);
 
       const response = await fetch(API_ENDPOINTS.AVATAR, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
+          // NO incluir Content-Type, fetch lo configura automáticamente para FormData
         },
         body: formData,
       });
 
+      console.log('Response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('Avatar subido exitosamente');
         // Invalidar caché de avatar para este usuario
         avatarCache.invalidate(user.usuario_id);
 
@@ -341,11 +361,19 @@ const Perfil = () => {
         setShowAvatarModal(false);
         Alert.alert('Éxito', 'Avatar actualizado');
       } else {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
         Alert.alert('Error', 'No se pudo actualizar el avatar');
       }
     } catch (error) {
       console.error('Error uploading avatar:', error);
-      Alert.alert('Error', 'Error al subir avatar');
+      // Retry automático si es el primer intento (problema común de timing en RN)
+      if (retryCount < 1) {
+        console.log('Reintentando subida de avatar...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return uploadAvatar(uri, retryCount + 1);
+      }
+      Alert.alert('Error', 'Error al subir avatar. Intenta de nuevo.');
     } finally {
       setUploadingAvatar(false);
     }

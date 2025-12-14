@@ -55,7 +55,8 @@ export default function useComments(postId) {
       const result = await res.json();
       // Optimistic update: prepend created comment
       setComments(prev => [result.comment, ...prev]);
-      return result;
+      // Devolver resultado con el contador actualizado del backend
+      return { ...result, commentCount: result.commentCount };
     } catch (err) {
       console.error('useComments.createComment error', err);
       setError(err.message || String(err));

@@ -28,7 +28,7 @@ export class CommentController {
       if (!post) return res.status(404).json({ message: 'Publicación no encontrada' });
 
       // Usar transacción para crear comentario y actualizar contador de forma atómica
-      const savedComment = await AppDataSource.manager.transaction(async transactionalEntityManager => {
+      const { savedComment, newCommentCount } = await AppDataSource.manager.transaction(async transactionalEntityManager => {
         const commentRepo = transactionalEntityManager.getRepository(Comentario);
 
         const newComment = commentRepo.create({
@@ -43,10 +43,13 @@ export class CommentController {
         // Incrementar contador de comentarios en la publicación
         await transactionalEntityManager.increment(Publicacion, { id: post.id }, 'contador_comentarios', 1);
 
-        return created;
+        // Obtener el contador actualizado
+        const updatedPost = await transactionalEntityManager.findOne(Publicacion, { where: { id: post.id }, select: ['contador_comentarios'] });
+
+        return { savedComment: created, newCommentCount: updatedPost?.contador_comentarios ?? (post.contador_comentarios + 1) };
       });
 
-      return res.status(201).json({ message: 'Comentario creado', comment: savedComment });
+      return res.status(201).json({ message: 'Comentario creado', comment: savedComment, commentCount: newCommentCount });
     } catch (err) {
       console.error('Error creando comentario:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';

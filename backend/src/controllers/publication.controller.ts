@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Publicacion} from '../entities/Publicacion';
 import { Mascota } from '../entities/Mascota';
 import { Interaccion } from '../entities/Interaccion';
+import { Comentario } from '../entities/Comentario';
 import { crear_interaccion, createPost, eliminar_interaccion } from '../services/post_service';
 import { getUserFromToken } from '../services/token_service';
 import { AppDataSource } from '../data-source';
@@ -34,33 +35,50 @@ export class PublicationController {
             }
 
             // 2. Query principal: Posts + Relaciones + Contadores
+            // contador_comentarios ya viene almacenado en la tabla publicacion (se actualiza atómicamente al crear/eliminar comentarios)
+            // Solo necesitamos calcular likes y compartidos desde interacciones
             const qb = publicationRepo.createQueryBuilder('publicacion')
                 .leftJoinAndSelect('publicacion.usuario', 'usuario')
                 .leftJoinAndSelect('publicacion.mascota', 'mascota')
+                .addSelect('publicacion.contador_comentarios') // Seleccionar el contador almacenado
                 .orderBy('publicacion.fecha', 'DESC');
 
-            // Mapear contadores directamente en el objeto
+            // Mapear contadores de likes y compartidos desde interacciones
             qb.loadRelationCountAndMap('publicacion.contador_likes', 'publicacion.interacciones', 'likes', (qb) => qb.where('likes.interaccion_tipo = :likeType', { likeType: 1 }));
-            qb.loadRelationCountAndMap('publicacion.contador_comentarios', 'publicacion.interacciones', 'comments', (qb) => qb.where('comments.interaccion_tipo = :commentType', { commentType: 2 }));
             qb.loadRelationCountAndMap('publicacion.contador_compartidos', 'publicacion.interacciones', 'shares', (qb) => qb.where('shares.interaccion_tipo = :shareType', { shareType: 3 }));
 
             const publications = await qb.getMany();
 
-            // 3. Si hay usuario, obtener qué posts ha likeado/comentado en una sola consulta
+            // 3. Si hay usuario, obtener qué posts ha likeado/comentado en consultas separadas
             let likedPostIds = new Set();
             let commentedPostIds = new Set();
             
             if (userId) {
-                const interactions = await interaccionRepo.createQueryBuilder('interaccion')
+                // Obtener likes desde Interaccion
+                const likeInteractions = await interaccionRepo.createQueryBuilder('interaccion')
                     .select('interaccion.publicacion_id', 'publicacionId')
-                    .addSelect('interaccion.interaccion_tipo', 'tipo')
                     .where('interaccion.usuario_id = :userId', { userId })
-                    .andWhere('interaccion.interaccion_tipo IN (:...types)', { types: [1, 2] })
+                    .andWhere('interaccion.interaccion_tipo = :likeType', { likeType: 1 })
                     .getRawMany();
                 
-                interactions.forEach(i => {
-                    if (i.tipo === 1) likedPostIds.add(i.publicacionId);
-                    if (i.tipo === 2) commentedPostIds.add(i.publicacionId);
+                likeInteractions.forEach(i => {
+                    likedPostIds.add(i.publicacionId);
+                });
+
+                // Obtener comentarios desde la tabla Comentario (no de Interaccion)
+                const comentarioRepo = dataSource.getRepository(Comentario);
+                const userComments = await comentarioRepo
+                    .createQueryBuilder('comentario')
+                    .innerJoin('comentario.publicacion', 'publicacion')
+                    .innerJoin('comentario.usuario', 'usuario')
+                    .select('DISTINCT publicacion.id', 'publicacionId')
+                    .where('usuario.usuario_id = :userId', { userId })
+                    .getRawMany();
+                
+                userComments.forEach(c => {
+                    // El valor puede venir como número o como string según el driver
+                    const pubId = typeof c.publicacionId === 'number' ? c.publicacionId : parseInt(c.publicacionId, 10);
+                    if (!isNaN(pubId)) commentedPostIds.add(pubId);
                 });
             }
 
@@ -94,18 +112,12 @@ export class PublicationController {
                 return res.status(404).json({ message: 'Publication not found' });
             }
 
-            // Calcular contadores de interacciones
-            const [likeCount, commentCount, shareCount] = await Promise.all([
+            // Calcular contadores: likes y compartidos desde Interaccion, comentarios ya está almacenado en la publicación
+            const [likeCount, shareCount] = await Promise.all([
                 interaccionRepo.count({
                     where: { 
                         publicacion: { id: publication.id }, 
                         interaccion_tipo: 1 
-                    }
-                }),
-                interaccionRepo.count({
-                    where: { 
-                        publicacion: { id: publication.id }, 
-                        interaccion_tipo: 2 
                     }
                 }),
                 interaccionRepo.count({
@@ -119,7 +131,7 @@ export class PublicationController {
             const publicationWithCounts = {
                 ...publication,
                 contador_likes: likeCount,
-                contador_comentarios: commentCount,
+                // contador_comentarios ya viene de la BD (se actualiza atómicamente al crear/eliminar comentarios)
                 contador_compartidos: shareCount
             };
 

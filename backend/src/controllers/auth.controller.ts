@@ -64,6 +64,10 @@ export class AuthController {
 
   static async uploadAvatar(req: MulterRequest, res: Response) {
     try {
+      console.log('uploadAvatar: Request recibida');
+      console.log('uploadAvatar: Headers:', req.headers['content-type']);
+      console.log('uploadAvatar: File:', req.file ? { size: req.file.size, mimetype: req.file.mimetype } : 'No file');
+      
       const auth = req.headers.authorization || '';
       const token = auth.startsWith('Bearer ') ? auth.slice(7) : auth;
 
@@ -78,12 +82,16 @@ export class AuthController {
         return res.status(400).json({ error: 'No se proporcionó imagen' });
       }
 
+      console.log('uploadAvatar: Guardando avatar para usuario:', user.usuario_id);
+
       // Guardar avatar como bytea
       const usuarioRepo = AppDataSource.getRepository(Usuario);
       await usuarioRepo.update(user.usuario_id, {
         avatar: req.file.buffer,
         avatar_mime_type: req.file.mimetype
       });
+
+      console.log('uploadAvatar: Avatar guardado exitosamente');
 
       return res.json({ 
         message: 'Avatar actualizado',
@@ -93,6 +101,7 @@ export class AuthController {
         }
       });
     } catch (err: any) {
+      console.error('uploadAvatar error:', err);
       return res.status(500).json({ error: err.message || 'Error al subir avatar' });
     }
   }

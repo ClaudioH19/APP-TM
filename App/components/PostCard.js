@@ -39,6 +39,14 @@ export const PostCard = ({ post }) => {
   const [likeCount, setLikeCount] = useState(post.contador_likes ?? 0);
   const [commentCount, setCommentCount] = useState(post.contador_comentarios ?? 0);
 
+  // Sincronizar estados cuando el post cambie (ej: al refrescar la lista)
+  useEffect(() => {
+    setLiked(post.hasLiked || false);
+    setCommented(post.hasCommented || false);
+    setLikeCount(post.contador_likes ?? 0);
+    setCommentCount(post.contador_comentarios ?? 0);
+  }, [post.id, post.hasLiked, post.hasCommented, post.contador_likes, post.contador_comentarios]);
+
   // Estados para loading
   const [loadingLike, setLoadingLike] = useState(false);
   const [loadingInteractions, setLoadingInteractions] = useState(false);
@@ -52,18 +60,15 @@ export const PostCard = ({ post }) => {
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [avatarError, setAvatarError] = useState(false);
 
-  // Función para actualizar el contador de comentarios desde el backend
-  // Se mantiene para actualizar después de comentar en el modal
-  const refreshCommentCount = async () => {
-    try {
-      const response = await fetch(`${API_ENDPOINTS.COMMENTS}?publicacion_id=${post.id}`);
-      if (response.ok) {
-        const comments = await response.json();
-        setCommentCount(comments.length);
-        setCommented(comments.length > 0);
-      }
-    } catch (error) {
-      console.error('Error al actualizar contador de comentarios:', error);
+  // Función para actualizar el contador de comentarios - ahora recibe el contador directamente del backend
+  const handleCommentCreated = (newCount) => {
+    if (typeof newCount === 'number') {
+      setCommentCount(newCount);
+      setCommented(true);
+    } else {
+      // Fallback: incrementar optimistamente si no viene el contador
+      setCommentCount(c => c + 1);
+      setCommented(true);
     }
   };
 
@@ -284,7 +289,7 @@ export const PostCard = ({ post }) => {
         postId={post.id}
         visible={commentsVisible}
         onClose={closeComments}
-        onCommentCreated={refreshCommentCount}
+        onCommentCreated={handleCommentCreated}
       />
     </View>
   );

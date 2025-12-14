@@ -19,11 +19,11 @@ export default function CommentsModal({ postId, visible, onClose, onCommentCreat
   const handleSend = async () => {
     if (!text.trim()) return;
     try {
-      await createComment(text.trim());
+      const result = await createComment(text.trim());
       setText('');
-      // Notificar al parent que se creó un comentario
+      // Notificar al parent con el contador actualizado del backend
       if (onCommentCreated) {
-        onCommentCreated();
+        onCommentCreated(result.commentCount);
       }
     } catch (err) {
       // error handled in hook
