@@ -7,6 +7,27 @@ export class MascotaService {
     private mascotaRepository = AppDataSource.getRepository(Mascota);
     private usuarioRepository = AppDataSource.getRepository(Usuario);
 
+    // Parsea una fecha en formato 'YYYY-MM-DD' o Date.
+    // Retorna un objeto Date construido con year,month,day (hora local) para evitar
+    // desfases por zona horaria al convertir desde ISO UTC.
+    private parseDate = (input?: string | Date | null): Date | null => {
+        if (!input) return null;
+        if (input instanceof Date) return input;
+        if (typeof input === 'string') {
+            const m = input.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (m) {
+                const y = parseInt(m[1], 10);
+                const mo = parseInt(m[2], 10) - 1;
+                const d = parseInt(m[3], 10);
+                return new Date(y, mo, d);
+            }
+            // fallback: try native parse
+            const dt = new Date(input);
+            return isNaN(dt.getTime()) ? null : dt;
+        }
+        return null;
+    };
+
     async registrarMascota(data: {
         nombre: string;
         especie: string;
@@ -32,8 +53,8 @@ export class MascotaService {
         }
 
         // Validar fecha de nacimiento (no puede ser futura)
-        const fechaNacimiento = new Date(data.fecha_nacimiento);
-        if (isNaN(fechaNacimiento.getTime())) {
+        const fechaNacimiento = this.parseDate(data.fecha_nacimiento);
+        if (!fechaNacimiento || isNaN(fechaNacimiento.getTime())) {
             throw new Error('Fecha de nacimiento inválida');
         }
         if (fechaNacimiento > new Date()) {
@@ -129,8 +150,8 @@ export class MascotaService {
             if (!fecha_nacimiento) {
                 (mascota as any).fecha_nacimiento = null;
             } else {
-                const f = new Date(fecha_nacimiento);
-                if (isNaN(f.getTime())) throw new Error('Fecha de nacimiento inválida');
+                const f = this.parseDate(fecha_nacimiento as string | Date);
+                if (!f || isNaN(f.getTime())) throw new Error('Fecha de nacimiento inválida');
                 if (f > new Date()) throw new Error('La fecha de nacimiento no puede ser futura');
                 (mascota as any).fecha_nacimiento = f;
             }

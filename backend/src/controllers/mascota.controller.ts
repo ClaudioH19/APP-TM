@@ -88,6 +88,7 @@ export class MascotaController {
 
     static async actualizar(req: Request, res: Response) {
         try {
+            console.log('Mascota actualizar body:', req.body);
             const usuario_id = (req as any).user?.usuario_id;
             if (!usuario_id) return res.status(401).json({ error: 'No autenticado' });
 
