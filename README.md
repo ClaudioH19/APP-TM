@@ -74,7 +74,7 @@ npm start           # Inicia servidor en modo producción
 ### Desarrollo - Frontend
 ```bash
 cd App
-npm run web         # Ejecuta en navegador web
+npx run web         # Ejecuta en navegador web
 # o
 npx expo start      # Inicia servidor Expo (para móvil y web)
 ```
@@ -122,9 +122,9 @@ npm run dev    # Desarrollo con nodemon
 
 ### Frontend
 ```bash
-npm start      # Iniciar Expo
-npm run web    # Ejecutar en web
-npm run android # Ejecutar en Android
-npm run ios    # Ejecutar en iOS
+npx start      # Iniciar Expo
+npx run web    # Ejecutar en web
+npx run android # Ejecutar en Android
+npx run ios    # Ejecutar en iOS
 ```
 
