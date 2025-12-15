@@ -24,7 +24,6 @@
       }
     },
     "android": {
-      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
@@ -46,6 +45,16 @@
       "eas": {
         "projectId": "7cac9693-c8c8-4f41-9de2-c827d44b5953"
       }
-    }
+    },
+    "plugins": [
+      [
+      "expo-build-properties",
+      {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ]
   }
 }

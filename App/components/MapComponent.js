@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Alert, ActivityIndicator, Text, TouchableOpacity, Modal, FlatList, Platform, Linking } from 'react-native';
-import MapView, { PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
+import MapView, { UrlTile, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Pedometer, Accelerometer } from 'expo-sensors';
 import { MapPin, X, Check, Play, Square, Footprints } from 'lucide-react-native';
@@ -9,9 +9,10 @@ import CreatePointModal from './CreatePointModal';
 import PointDetailModal from './PointDetailModal';
 import { getInterestPoints, formatPointsForMap, createInterestPoint } from '../services/interestPointsService';
 import { useIsFocused } from '@react-navigation/native';
-import { API_ENDPOINTS } from '../config/api';
+import { API_ENDPOINTS, API_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import twrnc from 'twrnc';
+
 
 
 const mapStyle = [
@@ -280,14 +281,18 @@ const MapComponent = () => {
             return newCoords;
           });
 
-          // Centrar mapa en la nueva ubicación
-          if (mapRef.current) {
-            mapRef.current.animateToRegion({
-              latitude,
-              longitude,
-              latitudeDelta: 0.005,
-              longitudeDelta: 0.005,
-            }, 500);
+          // Centrar mapa en la nueva ubicación (defensivo)
+          try {
+            if (mapRef.current?.animateToRegion) {
+              mapRef.current.animateToRegion({
+                latitude,
+                longitude,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+              }, 500);
+            }
+          } catch (e) {
+            console.warn('Error animating map region:', e);
           }
         }
       );
@@ -303,16 +308,16 @@ const MapComponent = () => {
   const stopTracking = async () => {
     // Detener suscripciones siempre, independientemente del estado isTracking
     if (subscriptionRef.current) {
-      subscriptionRef.current.remove();
+      try { subscriptionRef.current.remove(); } catch (e) { console.warn('Error removing subscriptionRef:', e); }
       subscriptionRef.current = null;
     }
     if (locationSubscriptionRef.current) {
-      locationSubscriptionRef.current.remove();
+      try { locationSubscriptionRef.current.remove(); } catch (e) { console.warn('Error removing locationSubscriptionRef:', e); }
       locationSubscriptionRef.current = null;
     }
 
     // Detener acelerómetro explícitamente
-    Accelerometer.removeAllListeners();
+    try { Accelerometer.removeAllListeners(); } catch (e) { /* ignore */ }
 
     if (!isTracking) return;
 
@@ -525,7 +530,6 @@ const MapComponent = () => {
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={PROVIDER_GOOGLE}
         customMapStyle={mapStyle}
         initialRegion={region}
         showsPointsOfInterest={false}
@@ -543,6 +547,14 @@ const MapComponent = () => {
         followsUserLocation={false}
         pitchEnabled={true}
       >
+        {/* OpenStreetMap tiles (no API key required) */}
+        <UrlTile
+          // Use backend tile proxy to avoid direct provider blocks
+          urlTemplate={`${API_URL}/api/tiles/{z}/{x}/{y}.png`}
+          zIndex={0}
+          maximumZ={19}
+          tileSize={256}
+        />
         {/* Marcadores de puntos de interés */}
         {!createMode && interestPoints.map((point) => (
           <CustomMarker
@@ -561,6 +573,11 @@ const MapComponent = () => {
           />
         )}
       </MapView>
+
+      {/* OpenStreetMap credit (required by tile usage policy) */}
+      <View style={{ position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(255,255,255,0.85)', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 6 }}>
+        <Text style={{ fontSize: 10, color: '#333' }}>© OpenStreetMap contributors</Text>
+      </View>
 
       {/* Panel de control de recorrido */}
       {isTracking && (

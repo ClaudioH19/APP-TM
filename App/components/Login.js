@@ -30,13 +30,25 @@ export default function Login({ onLoginSuccess, onCreateAccount }) {
       if (!validate()) return;
       setLoading(true);
       try {
+        console.log('[LOGIN] Enviando POST a', API_ENDPOINTS.LOGIN);
+        console.log('[LOGIN] Body:', { email });
+
         const resp = await fetch(API_ENDPOINTS.LOGIN, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({email, password}),
         });
 
-        const data = await resp.json();
+        let data = null;
+        try {
+          data = await resp.json();
+        } catch (parseErr) {
+          const text = await resp.text().catch(() => '<no body>');
+          console.warn('[LOGIN] No JSON response, status=', resp.status, 'body=', text);
+          data = { message: text };
+        }
+
+        console.log('[LOGIN] Response status:', resp.status, 'ok:', resp.ok, 'body:', data);
         if (!resp.ok) {
           Alert.alert('Login fallido', data.message || 'Credenciales inválidas');
           setLoading(false);

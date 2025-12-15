@@ -8,6 +8,7 @@ import commentRouter from './comment';
 import mascotasRouter from './mascota';
 import historialRouter from './historial';
 import recorridoRouter from './recorrido';
+import tilesRouter from './tiles';
 const router = Router();
 
 
@@ -29,5 +30,7 @@ router.use('/usuarios', usuarioRouter);
 router.use('/mascotas', mascotasRouter);
 router.use('/', historialRouter);
 router.use('/recorridos', recorridoRouter);
+// Proxy de tiles (OpenStreetMap)
+router.use('/tiles', tilesRouter);
 
 export default router;
