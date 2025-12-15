@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator, Text, TouchableOpacity, Modal, FlatList, Platform, Linking } from 'react-native';
-import MapView, { UrlTile, Polyline } from 'react-native-maps';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, StyleSheet, Alert, ActivityIndicator, Text, TouchableOpacity, Modal, FlatList, Platform } from 'react-native';
+import MapView, { PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Pedometer, Accelerometer } from 'expo-sensors';
 import { MapPin, X, Check, Play, Square, Footprints } from 'lucide-react-native';
@@ -9,66 +9,56 @@ import CreatePointModal from './CreatePointModal';
 import PointDetailModal from './PointDetailModal';
 import { getInterestPoints, formatPointsForMap, createInterestPoint } from '../services/interestPointsService';
 import { useIsFocused } from '@react-navigation/native';
-import { API_ENDPOINTS, API_URL } from '../config/api';
+import { API_ENDPOINTS } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import twrnc from 'twrnc';
-
-
 
 const mapStyle = [
   {
     "featureType": "poi",
     "elementType": "labels",
-    "stylers": [
-      { "visibility": "off" }
-    ]
+    "stylers": [{ "visibility": "off" }]
   },
   {
     "featureType": "poi.business",
     "elementType": "labels",
-    "stylers": [
-      { "visibility": "off" }
-    ]
+    "stylers": [{ "visibility": "off" }]
   }
 ];
 
 const MapComponent = () => {
   const mapRef = useRef(null);
-  const lastStepTime = useRef(0); // Para el acelerómetro
-  const usingPedometerRef = useRef(false); // Ref para evitar problemas de clausura en callbacks
+  const lastStepTime = useRef(0);
+  const usingPedometerRef = useRef(false);
+  const subscriptionRef = useRef(null);
+  const locationSubscriptionRef = useRef(null);
+  const accelerometerSubscriptionRef = useRef(null);
+  const isMountedRef = useRef(true);
+  const lastMagRef = useRef(0);
+  
   const [region, setRegion] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [interestPoints, setInterestPoints] = useState([]);
   const [loadingPoints, setLoadingPoints] = useState(false);
-
   const [createMode, setCreateMode] = useState(false);
   const [centerCoordinate, setCenterCoordinate] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const isFocused = useIsFocused();
-
-  // Estados para el modal de detalles
   const [selectedPoint, setSelectedPoint] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-
-  // Estados para el recorrido
   const [isTracking, setIsTracking] = useState(false);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [currentStepCount, setCurrentStepCount] = useState(0);
-  const [initialStepCount, setInitialStepCount] = useState(0);
-
-  // Refs para suscripciones (para limpieza segura al desmontar)
-  const subscriptionRef = useRef(null);
-  const locationSubscriptionRef = useRef(null);
-
   const [showPetSelectionModal, setShowPetSelectionModal] = useState(false);
   const [myPets, setMyPets] = useState([]);
   const [selectedPet, setSelectedPet] = useState(null);
   const [usingPedometer, setUsingPedometer] = useState(false);
 
-  // Función auxiliar para calcular distancia entre dos coordenadas (Haversine formula)
-  const getDistanceFromLatLonInMeters = (lat1, lon1, lat2, lon2) => {
-    const R = 6371e3; // Radio de la tierra en metros
+  const isFocused = useIsFocused();
+
+  // Función auxiliar para calcular distancia
+  const getDistanceFromLatLonInMeters = useCallback((lat1, lon1, lat2, lon2) => {
+    const R = 6371e3;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a =
@@ -76,129 +66,184 @@ const MapComponent = () => {
       Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const d = R * c;
-    return d;
-  };
-
-  useEffect(() => {
-    getUserLocation();
-    loadInterestPoints();
-    fetchMyPets();
-
-    // Limpieza robusta al desmontar
-    return () => {
-      console.log('🧹 Limpiando recursos del mapa...');
-
-      // 1. Limpiar suscripción de podómetro/acelerómetro
-      if (subscriptionRef.current) {
-        try {
-          subscriptionRef.current.remove();
-        } catch (e) { console.log('Error limpiando sub:', e); }
-        subscriptionRef.current = null;
-      }
-
-      // 2. Limpiar suscripción de ubicación
-      if (locationSubscriptionRef.current) {
-        try {
-          locationSubscriptionRef.current.remove();
-        } catch (e) { console.log('Error limpiando loc:', e); }
-        locationSubscriptionRef.current = null;
-      }
-
-      // 3. Detener TODOS los listeners globales de sensores por si acaso
-      try {
-        Accelerometer.removeAllListeners();
-        Pedometer.removeAllListeners?.(); // Pedometer a veces no tiene este método en todas las versiones
-      } catch (e) { }
-    };
+    return R * c;
   }, []);
 
-  // Efecto adicional para limpiar cuando la pantalla pierde el foco (Tab Navigation)
-  useEffect(() => {
-    if (!isFocused) {
-      console.log('💤 Mapa perdió foco -> Pausando sensores no esenciales');
-      // Opcional: Podríamos pausar el rastreo aquí si quisiéramos ahorrar batería
-      // Pero si queremos rastreo en background, NO debemos limpiar aquí.
-      // Solo limpiamos si el usuario NO está rastreando activamente.
-      if (!isTracking) {
-        if (locationSubscriptionRef.current) {
-          locationSubscriptionRef.current.remove();
-          locationSubscriptionRef.current = null;
-        }
+  // Función de limpieza centralizada
+  const cleanupSensors = useCallback(() => {
+    console.log('🧹 Limpiando sensores...');
+    
+    if (subscriptionRef.current) {
+      try {
+        subscriptionRef.current.remove();
+      } catch (e) {
+        console.log('Error limpiando subscription:', e);
       }
-    } else {
-      // Al volver al foco, si no estamos rastreando, podríamos querer actualizar ubicación una vez
-      if (!isTracking && !locationSubscriptionRef.current) {
-        getUserLocation();
-      }
+      subscriptionRef.current = null;
     }
-  }, [isFocused, isTracking]);
 
-  const fetchMyPets = async () => {
+    if (locationSubscriptionRef.current) {
+      try {
+        locationSubscriptionRef.current.remove();
+      } catch (e) {
+        console.log('Error limpiando location:', e);
+      }
+      locationSubscriptionRef.current = null;
+    }
+
+    if (accelerometerSubscriptionRef.current) {
+      try {
+        accelerometerSubscriptionRef.current.remove();
+      } catch (e) {
+        console.log('Error limpiando accelerometer:', e);
+      }
+      accelerometerSubscriptionRef.current = null;
+    }
+
+    try {
+      Accelerometer.removeAllListeners();
+    } catch (e) {
+      console.log('Error removing accelerometer listeners:', e);
+    }
+  }, []);
+
+  // Fetch pets
+  const fetchMyPets = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) return;
+      if (!token || !isMountedRef.current) return;
 
       const response = await fetch(API_ENDPOINTS.PROFILE_PETS, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (response.ok) {
+      if (response.ok && isMountedRef.current) {
         const data = await response.json();
-        // El backend devuelve un array directamente o un objeto con la propiedad mascotas
         const pets = Array.isArray(data) ? data : (data.mascotas || []);
         setMyPets(pets);
       }
     } catch (error) {
       console.error('Error fetching pets:', error);
     }
-  };
+  }, []);
 
-  // Función de respaldo usando el acelerómetro
-  const startAccelerometer = async () => {
+  // Load interest points
+  const loadInterestPoints = useCallback(async () => {
+    if (!isMountedRef.current) return;
+    
+    setLoadingPoints(true);
     try {
-      const isAvailable = await Accelerometer.isAvailableAsync();
-      if (!isAvailable) {
-        console.log('❌ Acelerómetro no disponible en hardware');
+      const rawPoints = await getInterestPoints();
+      if (!isMountedRef.current) return;
+      
+      const formattedPoints = formatPointsForMap(rawPoints);
+      setInterestPoints(formattedPoints);
+      console.log(`✅ Cargados ${formattedPoints.length} puntos de interés`);
+    } catch (error) {
+      console.error('Error cargando puntos de interés:', error);
+      if (isMountedRef.current) {
+        Alert.alert('Error', 'No se pudieron cargar los puntos de interés.');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoadingPoints(false);
+      }
+    }
+  }, []);
+
+  // Get user location
+  const getUserLocation = useCallback(async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      if (status !== 'granted') {
+        if (isMountedRef.current) {
+          Alert.alert('Permiso denegado', 'Se necesita permiso de ubicación');
+          setRegion({
+            latitude: -33.4489,
+            longitude: -70.6693,
+            latitudeDelta: 0.0922,
+            longitudeDelta: 0.0421,
+          });
+          setLoading(false);
+        }
         return;
       }
 
-      console.log('🚀 Iniciando acelerómetro como fallback...');
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced, // Cambiado de High a Balanced
+      });
+
+      if (!isMountedRef.current) return;
+
+      const { latitude, longitude } = location.coords;
+      setUserLocation({ latitude, longitude });
+      setRegion({
+        latitude,
+        longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      });
+      setLoading(false);
+    } catch (error) {
+      console.error('Error obteniendo ubicación:', error);
+      if (isMountedRef.current) {
+        Alert.alert('Error', 'No se pudo obtener tu ubicación');
+        setRegion({
+          latitude: -33.4489,
+          longitude: -70.6693,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        });
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  // Start accelerometer
+  const startAccelerometer = useCallback(async () => {
+    try {
+      const isAvailable = await Accelerometer.isAvailableAsync();
+      if (!isAvailable) {
+        console.log('❌ Acelerómetro no disponible');
+        return;
+      }
+
+      console.log('🚀 Iniciando acelerómetro...');
       setUsingPedometer(true);
       usingPedometerRef.current = true;
 
-      Accelerometer.setUpdateInterval(100); // 10Hz
-
-      // Variables para suavizado (filtro paso bajo)
-      let lastMag = 0;
-      const alpha = 0.8; // Factor de suavizado
+      Accelerometer.setUpdateInterval(200); // Reducido de 100 a 200ms
 
       const sub = Accelerometer.addListener(({ x, y, z }) => {
+        if (!isMountedRef.current || !usingPedometerRef.current) return;
+
         const rawMag = Math.sqrt(x * x + y * y + z * z);
-        // Filtro simple: Mag_suave = alpha * Mag_suave_prev + (1 - alpha) * Mag_raw
-        const magnitude = alpha * lastMag + (1 - alpha) * rawMag;
-        lastMag = magnitude;
+        const magnitude = 0.8 * lastMagRef.current + 0.2 * rawMag;
+        lastMagRef.current = magnitude;
 
         const now = Date.now();
-
-        // Umbral restaurado: 1.2G y debounce de 350ms
         if (magnitude > 1.2 && now - lastStepTime.current > 350) {
           setCurrentStepCount(prev => prev + 1);
           lastStepTime.current = now;
         }
       });
-      subscriptionRef.current = sub;
+      
+      accelerometerSubscriptionRef.current = sub;
     } catch (error) {
       console.error('Error iniciando acelerómetro:', error);
-      Alert.alert('Error', 'No se pudo iniciar el sensor de movimiento.');
+      if (isMountedRef.current) {
+        Alert.alert('Error', 'No se pudo iniciar el sensor de movimiento.');
+      }
     }
-  };
+  }, []);
 
-  const startTracking = async (pet) => {
+  // Start tracking
+  const startTracking = useCallback(async (pet) => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permiso denegado', 'Se requiere permiso de ubicación para rastrear la ruta.');
+        Alert.alert('Permiso denegado', 'Se requiere permiso de ubicación.');
         return;
       }
 
@@ -207,7 +252,6 @@ const MapComponent = () => {
         const isPedometerAvailable = await Pedometer.isAvailableAsync();
         if (isPedometerAvailable) {
           const { status: pedometerStatus } = await Pedometer.getPermissionsAsync();
-
           if (pedometerStatus === 'granted') {
             usePedometer = true;
           } else {
@@ -219,7 +263,6 @@ const MapComponent = () => {
         }
       } catch (e) {
         console.log('Error verificando podómetro:', e);
-        // Si falla la verificación, asumimos que no se puede usar y seguimos con acelerómetro
       }
 
       setIsTracking(true);
@@ -231,11 +274,13 @@ const MapComponent = () => {
       usingPedometerRef.current = false;
 
       if (usePedometer) {
-        console.log('✅ Usando Pedometer nativo');
+        console.log('✅ Usando Pedometer');
         setUsingPedometer(true);
         usingPedometerRef.current = true;
         let initialSteps = null;
         const sub = Pedometer.watchStepCount(result => {
+          if (!isMountedRef.current) return;
+          
           if (Platform.OS === 'android') {
             if (initialSteps === null) initialSteps = result.steps;
             setCurrentStepCount(result.steps - initialSteps);
@@ -245,33 +290,31 @@ const MapComponent = () => {
         });
         subscriptionRef.current = sub;
       } else {
-        // Si no hay podómetro o permiso, usamos acelerómetro
-        console.log('⚠️ Pedometer no disponible/denegado -> Usando Acelerómetro');
+        console.log('⚠️ Usando Acelerómetro');
         await startAccelerometer();
       }
 
-      // Iniciar rastreo de ubicación
+      // Location tracking con configuración optimizada
       const locSub = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 5000, // cada 5 segundos
-          distanceInterval: 5, // cada 5 metros
+          accuracy: Location.Accuracy.Balanced, // Cambiado de High
+          timeInterval: 10000, // Aumentado de 5000 a 10000ms
+          distanceInterval: 10, // Aumentado de 5 a 10 metros
         },
         (location) => {
+          if (!isMountedRef.current) return;
+
           const { latitude, longitude } = location.coords;
 
           setRouteCoordinates(prev => {
             const newCoords = [...prev, { latitude, longitude, timestamp: new Date() }];
 
-            // Si no usamos podómetro (ni nativo ni acelerómetro), estimar pasos basados en distancia
-            // Usamos usingPedometerRef para asegurar el valor actual dentro del callback
             if (!usingPedometerRef.current && prev.length > 0) {
               const lastPoint = prev[prev.length - 1];
               const dist = getDistanceFromLatLonInMeters(
                 lastPoint.latitude, lastPoint.longitude,
                 latitude, longitude
               );
-              // Acumular pasos estimados (distancia / 0.762)
               const stepsToAdd = Math.round(dist / 0.762);
               if (stepsToAdd > 0) {
                 setCurrentStepCount(c => c + stepsToAdd);
@@ -281,18 +324,13 @@ const MapComponent = () => {
             return newCoords;
           });
 
-          // Centrar mapa en la nueva ubicación (defensivo)
-          try {
-            if (mapRef.current?.animateToRegion) {
-              mapRef.current.animateToRegion({
-                latitude,
-                longitude,
-                latitudeDelta: 0.005,
-                longitudeDelta: 0.005,
-              }, 500);
-            }
-          } catch (e) {
-            console.warn('Error animating map region:', e);
+          if (mapRef.current) {
+            mapRef.current.animateToRegion({
+              latitude,
+              longitude,
+              latitudeDelta: 0.005,
+              longitudeDelta: 0.005,
+            }, 500);
           }
         }
       );
@@ -300,36 +338,35 @@ const MapComponent = () => {
 
     } catch (error) {
       console.error('Error starting tracking:', error);
-      Alert.alert('Error', 'No se pudo iniciar el recorrido.');
-      setIsTracking(false);
+      if (isMountedRef.current) {
+        Alert.alert('Error', 'No se pudo iniciar el recorrido.');
+        setIsTracking(false);
+      }
     }
-  };
+  }, [startAccelerometer, getDistanceFromLatLonInMeters]);
 
-  const stopTracking = async () => {
-    // Detener suscripciones siempre, independientemente del estado isTracking
-    if (subscriptionRef.current) {
-      try { subscriptionRef.current.remove(); } catch (e) { console.warn('Error removing subscriptionRef:', e); }
-      subscriptionRef.current = null;
-    }
-    if (locationSubscriptionRef.current) {
-      try { locationSubscriptionRef.current.remove(); } catch (e) { console.warn('Error removing locationSubscriptionRef:', e); }
-      locationSubscriptionRef.current = null;
-    }
-
-    // Detener acelerómetro explícitamente
-    try { Accelerometer.removeAllListeners(); } catch (e) { /* ignore */ }
+  // Stop tracking
+  const stopTracking = useCallback(async () => {
+    cleanupSensors();
 
     if (!isTracking) return;
 
-    setIsTracking(false);
+    const wasTracking = isTracking;
+    const coords = [...routeCoordinates];
+    const steps = currentStepCount;
+    const pet = selectedPet;
 
-    if (routeCoordinates.length > 0 && selectedPet) {
-      // Guardar recorrido
+    setIsTracking(false);
+    setRouteCoordinates([]);
+    setCurrentStepCount(0);
+    setSelectedPet(null);
+
+    if (coords.length > 0 && pet && wasTracking) {
       try {
         const token = await AsyncStorage.getItem('token');
         if (!token) return;
 
-        const puntos = routeCoordinates.map(coord => ({
+        const puntos = coords.map(coord => ({
           latitud: coord.latitude,
           longitud: coord.longitude,
           timestamp: coord.timestamp
@@ -342,34 +379,30 @@ const MapComponent = () => {
             Authorization: `Bearer ${token}`
           },
           body: JSON.stringify({
-            mascotaId: selectedPet.mascota_id,
-            pasos: currentStepCount,
+            mascotaId: pet.mascota_id,
+            pasos: steps,
             puntos
           })
         });
 
-        if (response.ok) {
-          Alert.alert('¡Recorrido finalizado!', `Has dado ${currentStepCount} pasos con ${selectedPet.nombre}.`);
-        } else {
+        if (response.ok && isMountedRef.current) {
+          Alert.alert('¡Recorrido finalizado!', `Has dado ${steps} pasos con ${pet.nombre}.`);
+        } else if (isMountedRef.current) {
           Alert.alert('Error', 'No se pudo guardar el recorrido.');
         }
       } catch (error) {
         console.error('Error saving route:', error);
-        Alert.alert('Error', 'Error de conexión al guardar el recorrido.');
+        if (isMountedRef.current) {
+          Alert.alert('Error', 'Error al guardar el recorrido.');
+        }
       }
-    } else {
-      if (isTracking) Alert.alert('Aviso', 'No se registraron datos suficientes para guardar el recorrido.');
     }
+  }, [isTracking, routeCoordinates, currentStepCount, selectedPet, cleanupSensors]);
 
-    // Limpiar estado
-    setRouteCoordinates([]);
-    setCurrentStepCount(0);
-    setSelectedPet(null);
-  };
-
-  const handleStartPress = () => {
+  // Handle start press
+  const handleStartPress = useCallback(() => {
     if (myPets.length === 0) {
-      Alert.alert('Sin mascotas', 'Necesitas registrar una mascota en tu perfil para iniciar un recorrido.');
+      Alert.alert('Sin mascotas', 'Necesitas registrar una mascota para iniciar un recorrido.');
       return;
     }
     if (myPets.length === 1) {
@@ -377,127 +410,25 @@ const MapComponent = () => {
     } else {
       setShowPetSelectionModal(true);
     }
-  };
+  }, [myPets, startTracking]);
 
-  // actualizar coordenada del centro al mover el mapa (solo en modo creación)
-  useEffect(() => {
-    if (createMode && region) {
-      setCenterCoordinate({
-        latitude: region.latitude,
-        longitude: region.longitude,
-      });
-    }
-  }, [region, createMode]);
-
-  const getUserLocation = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permiso denegado',
-          'Se necesita permiso de ubicación para mostrar tu posición en el mapa'
-        );
-        setRegion({
-          latitude: -33.4489,
-          longitude: -70.6693,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        });
-        setLoading(false);
-        return;
-      }
-
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-
-      const { latitude, longitude } = location.coords;
-
-      setUserLocation({ latitude, longitude });
-      setRegion({
-        latitude,
-        longitude,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
-      });
-      setLoading(false);
-    } catch (error) {
-      console.error('Error obteniendo ubicación:', error);
-      Alert.alert('Error', 'No se pudo obtener tu ubicación');
-      setRegion({
-        latitude: -33.4489,
-        longitude: -70.6693,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
-      });
-      setLoading(false);
-    }
-  };
-
-  const loadInterestPoints = async () => {
-    setLoadingPoints(true);
-    try {
-      const rawPoints = await getInterestPoints();
-      const formattedPoints = formatPointsForMap(rawPoints);
-      setInterestPoints(formattedPoints);
-      console.log(`✅ Se cargaron ${formattedPoints.length} puntos de interés`);
-    } catch (error) {
-      console.error('Error cargando puntos de interés:', error);
-      Alert.alert('Error', 'No se pudieron cargar los puntos de interés. Verifica tu conexión.');
-    } finally {
-      setLoadingPoints(false);
-    }
-  };
-
-  /**
-   * Maneja cuando se presiona el callout de un marcador
-   */
-  const handleCalloutPress = (point) => {
+  // Handle callout press
+  const handleCalloutPress = useCallback((point) => {
     console.log('Abriendo detalles de:', point.title);
     setSelectedPoint(point);
     setShowDetailModal(true);
-  };
+  }, []);
 
-  /**
-   * Cierra el modal de detalles
-   */
-  const handleCloseDetailModal = () => {
-    setShowDetailModal(false);
-    setSelectedPoint(null);
-  };
-
-  const handleActivateCreateMode = () => {
-    setCreateMode(true);
-    setCenterCoordinate({
-      latitude: region.latitude,
-      longitude: region.longitude,
-    });
-  };
-
-  const handleCancelCreateMode = () => {
-    setCreateMode(false);
-    setCenterCoordinate(null);
-  };
-
-  const handleConfirmLocation = () => {
-    Alert.alert(
-      'Confirmar ubicación',
-      '¿Deseas crear un punto de interés en esta ubicación?',
-      [
-        { text: 'No', style: 'cancel' },
-        { text: 'Sí', onPress: () => setShowCreateModal(true) },
-      ]
-    );
-  };
-
-  const handleSubmitPoint = async (pointData) => {
+  // Handle submit point
+  const handleSubmitPoint = useCallback(async (pointData) => {
     try {
       await createInterestPoint(pointData);
+      if (!isMountedRef.current) return;
+      
       setShowCreateModal(false);
       Alert.alert(
         '¡Éxito!',
-        'El punto de interés ha sido creado correctamente',
+        'El punto de interés ha sido creado',
         [
           {
             text: 'OK',
@@ -511,10 +442,48 @@ const MapComponent = () => {
       );
     } catch (error) {
       console.error('Error al crear punto:', error);
-      setShowCreateModal(false);
-      Alert.alert('Error', error.message || 'No se pudo crear el punto de interés');
+      if (isMountedRef.current) {
+        setShowCreateModal(false);
+        Alert.alert('Error', error.message || 'No se pudo crear el punto de interés');
+      }
     }
-  };
+  }, [loadInterestPoints]);
+
+  // Update center coordinate
+  useEffect(() => {
+    if (createMode && region) {
+      setCenterCoordinate({
+        latitude: region.latitude,
+        longitude: region.longitude,
+      });
+    }
+  }, [region, createMode]);
+
+  // Focus effect
+  useEffect(() => {
+    if (!isFocused && !isTracking) {
+      if (locationSubscriptionRef.current) {
+        locationSubscriptionRef.current.remove();
+        locationSubscriptionRef.current = null;
+      }
+    } else if (isFocused && !isTracking && !locationSubscriptionRef.current) {
+      getUserLocation();
+    }
+  }, [isFocused, isTracking, getUserLocation]);
+
+  // Mount/unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    getUserLocation();
+    loadInterestPoints();
+    fetchMyPets();
+
+    return () => {
+      console.log('🧹 Desmontando componente...');
+      isMountedRef.current = false;
+      cleanupSensors();
+    };
+  }, [getUserLocation, loadInterestPoints, fetchMyPets, cleanupSensors]);
 
   if (loading) {
     return (
@@ -530,6 +499,7 @@ const MapComponent = () => {
       <MapView
         ref={mapRef}
         style={styles.map}
+        provider={PROVIDER_GOOGLE}
         customMapStyle={mapStyle}
         initialRegion={region}
         showsPointsOfInterest={false}
@@ -537,25 +507,16 @@ const MapComponent = () => {
         showsCompass={false}
         rotateEnabled={false}
         onRegionChangeComplete={(newRegion) => {
-
-          // solo actualizar región en modo creación para capturar coordenada del centro
           if (createMode) {
             setRegion(newRegion);
           }
         }}
-        showsMyLocationButton={!createMode} // ocultar botón GPS en modo creación
+        showsMyLocationButton={!createMode}
         followsUserLocation={false}
         pitchEnabled={true}
+        maxZoomLevel={18}
+        minZoomLevel={10}
       >
-        {/* OpenStreetMap tiles (no API key required) */}
-        <UrlTile
-          // Use backend tile proxy to avoid direct provider blocks
-          urlTemplate={`${API_URL}/api/tiles/{z}/{x}/{y}.png`}
-          zIndex={0}
-          maximumZ={19}
-          tileSize={256}
-        />
-        {/* Marcadores de puntos de interés */}
         {!createMode && interestPoints.map((point) => (
           <CustomMarker
             key={point.id}
@@ -564,8 +525,7 @@ const MapComponent = () => {
           />
         ))}
 
-        {/* Ruta actual */}
-        {isTracking && routeCoordinates.length > 0 && (
+        {isTracking && routeCoordinates.length > 1 && (
           <Polyline
             coordinates={routeCoordinates}
             strokeColor="#3b82f6"
@@ -574,12 +534,6 @@ const MapComponent = () => {
         )}
       </MapView>
 
-      {/* OpenStreetMap credit (required by tile usage policy) */}
-      <View style={{ position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(255,255,255,0.85)', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 6 }}>
-        <Text style={{ fontSize: 10, color: '#333' }}>© OpenStreetMap contributors</Text>
-      </View>
-
-      {/* Panel de control de recorrido */}
       {isTracking && (
         <View style={twrnc`absolute bottom-12 left-4 right-4 bg-white rounded-xl p-4 shadow-lg flex-row justify-between items-center`}>
           <View>
@@ -609,7 +563,6 @@ const MapComponent = () => {
         </View>
       )}
 
-      {/* Botón para iniciar recorrido (solo si no está creando punto ni rastreando) */}
       {!createMode && !isTracking && (
         <TouchableOpacity
           style={twrnc`absolute bottom-40 right-3 bg-green-500 w-14 h-14 rounded-full items-center justify-center shadow-lg`}
@@ -619,7 +572,6 @@ const MapComponent = () => {
         </TouchableOpacity>
       )}
 
-      {/* Modal de selección de mascota */}
       <Modal
         visible={showPetSelectionModal}
         transparent={true}
@@ -657,29 +609,35 @@ const MapComponent = () => {
         </View>
       </Modal>
 
-      {/* pin rojo en el centro del mapa (solo visible en modo creación) */}
       {createMode && (
         <View style={styles.centerMarker}>
           <MapPin size={40} color="#ef4444" fill="#ef4444" />
         </View>
       )}
 
-      {/* botón flotante para activar modo creación de puntos */}
       {!createMode && (
         <TouchableOpacity
           style={styles.createButtonFAB}
-          onPress={handleActivateCreateMode}
+          onPress={() => {
+            setCreateMode(true);
+            setCenterCoordinate({
+              latitude: region.latitude,
+              longitude: region.longitude,
+            });
+          }}
         >
           <MapPin size={24} color="#fff" />
         </TouchableOpacity>
       )}
 
-      {/* botones de cancelar y confirmar (solo visibles en modo creación) */}
       {createMode && (
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={[styles.actionButton, styles.cancelButton]}
-            onPress={handleCancelCreateMode}
+            onPress={() => {
+              setCreateMode(false);
+              setCenterCoordinate(null);
+            }}
           >
             <X size={20} color="#374151" />
             <Text style={styles.cancelButtonText}>Cancelar</Text>
@@ -687,7 +645,16 @@ const MapComponent = () => {
 
           <TouchableOpacity
             style={[styles.actionButton, styles.confirmButton]}
-            onPress={handleConfirmLocation}
+            onPress={() => {
+              Alert.alert(
+                'Confirmar ubicación',
+                '¿Deseas crear un punto de interés en esta ubicación?',
+                [
+                  { text: 'No', style: 'cancel' },
+                  { text: 'Sí', onPress: () => setShowCreateModal(true) },
+                ]
+              );
+            }}
           >
             <Check size={20} color="#fff" />
             <Text style={styles.confirmButtonText}>Crear punto de interés</Text>
@@ -695,7 +662,6 @@ const MapComponent = () => {
         </View>
       )}
 
-      {/* indicador de carga en esquina superior derecha */}
       {loadingPoints && (
         <View style={styles.loadingPointsContainer}>
           <ActivityIndicator size="small" color="#3b82f6" />
@@ -703,7 +669,6 @@ const MapComponent = () => {
         </View>
       )}
 
-      {/* Modal de formulario para crear punto */}
       <CreatePointModal
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
@@ -711,11 +676,13 @@ const MapComponent = () => {
         coordinate={centerCoordinate || { latitude: 0, longitude: 0 }}
       />
 
-      {/* Modal de detalles del punto */}
       <PointDetailModal
         visible={showDetailModal}
         point={selectedPoint}
-        onClose={handleCloseDetailModal}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedPoint(null);
+        }}
       />
     </View>
   );
